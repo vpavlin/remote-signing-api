@@ -17,9 +17,11 @@ type Rpc struct {
 }
 
 type NonceManagerConfig struct {
-	AutoSync     bool   `json:"autoSync"`
-	SyncInterval uint64 `json:"syncInterval"`
-	SyncAfter    uint64 `json:"syncAfter"`
+	AutoSync      bool        `json:"autoSync"`
+	SyncInterval  uint64      `json:"syncInterval"`
+	SyncAfter     uint64      `json:"syncAfter"`
+	StorageType   string      `json:"storageType"`
+	StorageConfig interface{} `json:"storageConfig"`
 }
 
 type Config struct {
