@@ -6,18 +6,25 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	logrus "github.com/sirupsen/logrus"
+)
+
+const (
+	auto_sync_interval = 10 * time.Minute
+	auto_sync_after    = 1 * time.Hour
 )
 
 type INonce interface {
 	GetNonce() (uint64, error)
-	DecreaseNonce()
+	Sync(client *ethclient.Client) error
+	ReturnNonce(nonce uint64) error
 	store() error
 	load() error
 }
@@ -29,12 +36,27 @@ type Nonce struct {
 	nonce          uint64
 	returnedNonces SortedNonceArr
 	lock           sync.Mutex
+	lastUsed       int64
 }
 
-func NewNonce(client *ethclient.Client, address common.Address, chainId uint64) (*Nonce, error) {
+func NewNonce(client *ethclient.Client, address common.Address, chainId uint64, autoSync bool) (*Nonce, error) {
+	return NewNonceWithConfig(client, address, chainId, autoSync, auto_sync_interval, auto_sync_after)
+}
+
+func NewNonceWithConfig(client *ethclient.Client, address common.Address, chainId uint64, autoSync bool, syncInterval time.Duration, syncAfter time.Duration) (*Nonce, error) {
 	nonce := new(Nonce)
 	nonce.Address = address.String()
 	nonce.ChainId = chainId
+
+	defer func() {
+		if autoSync {
+			logrus.WithFields(logrus.Fields{
+				"address": address,
+				"chainId": chainId,
+			}).Info("Starting auto sync")
+			go nonce.autoSync(client, syncInterval, syncAfter)
+		}
+	}()
 
 	err := nonce.load()
 	if err != nil {
@@ -52,6 +74,7 @@ func NewNonce(client *ethclient.Client, address common.Address, chainId uint64) 
 	nonce.returnedNonces = make(SortedNonceArr, 0)
 
 	nonce.store()
+
 	return nonce, nil
 }
 
@@ -77,16 +100,15 @@ func (n *Nonce) GetNonce() (uint64, error) {
 	defer n.store()
 
 	if n.returnedNonces.Len() > 0 {
-		log.Println("Using returned nonces: ", n.returnedNonces)
+		logrus.Debug("Using returned nonces: ", n.returnedNonces)
 		nonce := n.returnedNonces[0]
 		n.returnedNonces = n.returnedNonces[1:]
-		log.Println(n.returnedNonces)
 		return nonce, nil
 	}
 
 	// return a new point
 	nonce := n.nonce
-	log.Println("Using nonce: ", n.nonce)
+	logrus.Debug("Using nonce: ", n.nonce)
 
 	// increase record
 	n.nonce++
@@ -141,6 +163,7 @@ type NonceSerializable struct {
 	ChainId        uint64         `json:"chainId"`
 	Nonce          uint64         `json:"nonce"`
 	ReturnedNonces SortedNonceArr `json:"returnedNonces"`
+	LastUsed       int64          `json:"lastUsed"`
 }
 
 func (n *Nonce) store() error {
@@ -148,11 +171,14 @@ func (n *Nonce) store() error {
 		return fmt.Errorf("Nonce object not initiliezed properly")
 	}
 
+	n.lastUsed = time.Now().Unix()
+
 	ns := new(NonceSerializable)
 	ns.Address = n.Address
 	ns.ChainId = n.ChainId
 	ns.Nonce = n.nonce
 	ns.ReturnedNonces = n.returnedNonces
+	ns.LastUsed = n.lastUsed
 
 	data, err := json.Marshal(ns)
 	if err != nil {
@@ -160,11 +186,15 @@ func (n *Nonce) store() error {
 	}
 
 	filename := fmt.Sprintf(".%s-%d.nonce.json", n.Address, n.ChainId)
+	logrus.Debugf("Storing nonce info into %s", filename)
+
 	return ioutil.WriteFile(filename, data, 0600)
 }
 
 func (n *Nonce) load() error {
 	filename := fmt.Sprintf(".%s-%d.nonce.json", n.Address, n.ChainId)
+
+	logrus.Debugf("Loading nonce info from %s", filename)
 
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
@@ -179,8 +209,27 @@ func (n *Nonce) load() error {
 
 	n.nonce = ns.Nonce
 	n.returnedNonces = ns.ReturnedNonces
+	n.lastUsed = ns.LastUsed
 
 	return nil
+}
+
+func (n *Nonce) autoSync(client *ethclient.Client, syncInterval time.Duration, syncAfter time.Duration) error {
+	for {
+		select {
+		case <-time.After(syncInterval):
+			logrus.Debug(n.lastUsed, " + ", int64(syncAfter.Seconds()), " = ", n.lastUsed+int64(syncAfter.Seconds()), " < ", time.Now().Unix())
+			if n.lastUsed+int64(syncAfter.Seconds()) < time.Now().Unix() {
+				logrus.WithFields(logrus.Fields{
+					"address": n.Address,
+					"chainId": n.ChainId,
+				}).Info("Executing auto-sync")
+				n.Sync(client)
+			}
+			//log.Infof("clearNonce: clear all cache nonce")
+
+		}
+	}
 }
 
 type SortedNonceArr []uint64

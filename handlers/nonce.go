@@ -31,10 +31,6 @@ func HandleSync(ctx echo.Context) error {
 	return NonceWrapper(SyncNonce, ctx)
 }
 
-func HandleDecreaseNonce(ctx echo.Context) error {
-	return NonceWrapper(DecreaseNonce, ctx)
-}
-
 func NonceWrapper(fn func(ctx echo.Context, nm *nonce.NonceManager, chainId uint64, address common.Address) error, ctx echo.Context) error {
 	addressS := ctx.Param("address")
 	chainIdS := ctx.Param("chainId")

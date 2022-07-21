@@ -1,13 +1,16 @@
 package main
 
 import (
-	"log"
+	"fmt"
+	"os"
 
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
+	"github.com/vpavlin/remote-signing-api/config"
 	"github.com/vpavlin/remote-signing-api/handlers"
 	"github.com/vpavlin/remote-signing-api/internal/nonce"
+
+	logrus "github.com/sirupsen/logrus"
 )
 
 func main() {
@@ -15,13 +18,21 @@ func main() {
 
 	e.Use(middleware.Logger())
 
-	client, err := ethclient.Dial("https://matic-testnet-archive-rpc.bwarelabs.com")
+	config, err := config.NewConfig(os.Args[1])
 	if err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
+
 	}
-	nm, err := nonce.NewNonceManager(client)
+
+	ll, err := logrus.ParseLevel(config.Server.LogLevel)
 	if err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
+	}
+	logrus.SetLevel(ll)
+
+	nm, err := nonce.NewNonceManager(config.RpcUrls, config.NonceManager)
+	if err != nil {
+		logrus.Fatal(err)
 	}
 
 	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -34,9 +45,7 @@ func main() {
 	//e.POST("/sign/:chainId/:address", handlers.HandleSign)
 	e.GET("/nonce/:chainId/:address", handlers.HandleGetNonce)
 	e.PUT("/nonce/:chainId/:address/:nonce", handlers.HandleReturnNonce)
-	e.DELETE("/nonce/:chainId/:address", handlers.HandleDecreaseNonce)
 	e.POST("/nonce/:chainId/:address/sync", handlers.HandleSync)
 
-	e.Start("localhost:4444")
-
+	e.Start(fmt.Sprintf("%s:%d", config.Server.Hostname, config.Server.Port))
 }
