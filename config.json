@@ -1,0 +1,17 @@
+{
+    "server": {
+        "hostname": "localhost",
+        "port": 4444
+    },
+    "rpcUrls": [
+        {
+            "chainId": 80001,
+            "url": "https://matic-testnet-archive-rpc.bwarelabs.com"
+        }
+    ],
+    "nonceManager": {
+        "autoSync": true,
+        "syncInterval": 1,
+        "syncAfter": 10
+    }
+}
