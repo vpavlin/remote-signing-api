@@ -19,6 +19,14 @@ type ErrorResponse struct {
 	Error string `json:"error"`
 }
 
+func SeuptNonceGroup(e *echo.Echo) {
+	g := e.Group("/nonce")
+
+	g.GET("/:chainId/:address", HandleGetNonce)
+	g.PUT("/:chainId/:address/:nonce", HandleReturnNonce)
+	g.POST("/:chainId/:address/sync", HandleSync)
+}
+
 func HandleGetNonce(ctx echo.Context) error {
 	return NonceWrapper(GetNonce, ctx)
 }

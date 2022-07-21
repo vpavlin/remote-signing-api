@@ -2,10 +2,8 @@ package nonce
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sort"
 	"sync"
@@ -14,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	logrus "github.com/sirupsen/logrus"
+	"github.com/vpavlin/remote-signing-api/internal/types"
 )
 
 const (
@@ -25,8 +24,6 @@ type INonce interface {
 	GetNonce() (uint64, error)
 	Sync(client *ethclient.Client) error
 	ReturnNonce(nonce uint64) error
-	store() error
-	load() error
 }
 
 type Nonce struct {
@@ -34,19 +31,21 @@ type Nonce struct {
 	Address        string
 	ChainId        uint64
 	nonce          uint64
-	returnedNonces SortedNonceArr
+	returnedNonces types.SortedNonceArr
 	lock           sync.Mutex
 	lastUsed       int64
+	storage        types.INonceStorage
 }
 
-func NewNonce(client *ethclient.Client, address common.Address, chainId uint64, autoSync bool) (*Nonce, error) {
-	return NewNonceWithConfig(client, address, chainId, autoSync, auto_sync_interval, auto_sync_after)
+func NewNonce(client *ethclient.Client, storage *types.INonceStorage, address common.Address, chainId uint64, autoSync bool) (*Nonce, error) {
+	return NewNonceWithConfig(client, storage, address, chainId, autoSync, auto_sync_interval, auto_sync_after)
 }
 
-func NewNonceWithConfig(client *ethclient.Client, address common.Address, chainId uint64, autoSync bool, syncInterval time.Duration, syncAfter time.Duration) (*Nonce, error) {
+func NewNonceWithConfig(client *ethclient.Client, storage *types.INonceStorage, address common.Address, chainId uint64, autoSync bool, syncInterval time.Duration, syncAfter time.Duration) (*Nonce, error) {
 	nonce := new(Nonce)
 	nonce.Address = address.String()
 	nonce.ChainId = chainId
+	nonce.storage = *storage
 
 	defer func() {
 		if autoSync {
@@ -58,12 +57,13 @@ func NewNonceWithConfig(client *ethclient.Client, address common.Address, chainI
 		}
 	}()
 
-	err := nonce.load()
+	ns, err := nonce.storage.Load(chainId, address.String())
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
 			return nil, err
 		}
 	} else {
+		nonce.deserialize(ns)
 		return nonce, nil
 	}
 
@@ -71,33 +71,53 @@ func NewNonceWithConfig(client *ethclient.Client, address common.Address, chainI
 	if err != nil {
 		return nil, err
 	}
-	nonce.returnedNonces = make(SortedNonceArr, 0)
+	nonce.returnedNonces = make(types.SortedNonceArr, 0)
 
-	nonce.store()
+	err = nonce.storage.Store(nonce.serialize())
+	if err != nil {
+		return nil, err
+	}
 
 	return nonce, nil
 }
 
-func (n *Nonce) Sync(client *ethclient.Client) error {
+func (n *Nonce) Sync(client *ethclient.Client) (err error) {
 	n.lock.Lock()
 	defer n.lock.Unlock()
-	defer n.store()
 
-	nonce, nonceErr := client.PendingNonceAt(context.Background(), common.HexToAddress(n.Address))
-	if nonceErr != nil {
+	defer func() {
+		deferErr := n.storage.Store(n.serialize())
+		if deferErr != nil {
+			logrus.Error(deferErr)
+			err = deferErr
+		}
+	}()
+
+	n.updateLastUsed()
+
+	nonce, err := client.PendingNonceAt(context.Background(), common.HexToAddress(n.Address))
+	if err != nil {
 		return fmt.Errorf("GetNonce: cannot get account %s nonce, err: %s, set it to nil!",
-			n.Address, nonceErr)
+			n.Address, err)
 	}
 	n.nonce = nonce
-	n.returnedNonces = make(SortedNonceArr, 0)
+	n.returnedNonces = make(types.SortedNonceArr, 0)
 
-	return nil
+	return err
 }
 
-func (n *Nonce) GetNonce() (uint64, error) {
+func (n *Nonce) GetNonce() (nonce uint64, err error) {
 	n.lock.Lock()
 	defer n.lock.Unlock()
-	defer n.store()
+	defer func() {
+		deferErr := n.storage.Store(n.serialize())
+		if deferErr != nil {
+			logrus.Error(deferErr)
+			err = deferErr
+		}
+	}()
+
+	n.updateLastUsed()
 
 	if n.returnedNonces.Len() > 0 {
 		logrus.Debug("Using returned nonces: ", n.returnedNonces)
@@ -107,7 +127,7 @@ func (n *Nonce) GetNonce() (uint64, error) {
 	}
 
 	// return a new point
-	nonce := n.nonce
+	nonce = n.nonce
 	logrus.Debug("Using nonce: ", n.nonce)
 
 	// increase record
@@ -116,10 +136,17 @@ func (n *Nonce) GetNonce() (uint64, error) {
 	return nonce, nil
 }
 
-func (n *Nonce) ReturnNonce(nonce uint64) error {
+func (n *Nonce) ReturnNonce(nonce uint64) (err error) {
 	n.lock.Lock()
 	defer n.lock.Unlock()
-	defer n.store()
+	defer func() {
+		deferErr := n.storage.Store(n.serialize())
+		if deferErr != nil {
+			logrus.Error(deferErr)
+			err = deferErr
+		}
+	}()
+	n.updateLastUsed()
 
 	if nonce >= n.nonce {
 		return fmt.Errorf("Returned nonce too high")
@@ -144,11 +171,12 @@ func (n *Nonce) DecreaseNonce() error {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 	defer func() {
-		deferErr := n.store()
+		deferErr := n.storage.Store(n.serialize())
 		if deferErr != nil {
 			err = deferErr
 		}
 	}()
+	n.updateLastUsed()
 
 	if n.nonce > 0 {
 		n.nonce--
@@ -156,62 +184,6 @@ func (n *Nonce) DecreaseNonce() error {
 
 	return err
 
-}
-
-type NonceSerializable struct {
-	Address        string         `json:"address"`
-	ChainId        uint64         `json:"chainId"`
-	Nonce          uint64         `json:"nonce"`
-	ReturnedNonces SortedNonceArr `json:"returnedNonces"`
-	LastUsed       int64          `json:"lastUsed"`
-}
-
-func (n *Nonce) store() error {
-	if len(n.Address) == 0 || n.ChainId == 0 {
-		return fmt.Errorf("Nonce object not initiliezed properly")
-	}
-
-	n.lastUsed = time.Now().Unix()
-
-	ns := new(NonceSerializable)
-	ns.Address = n.Address
-	ns.ChainId = n.ChainId
-	ns.Nonce = n.nonce
-	ns.ReturnedNonces = n.returnedNonces
-	ns.LastUsed = n.lastUsed
-
-	data, err := json.Marshal(ns)
-	if err != nil {
-		return err
-	}
-
-	filename := fmt.Sprintf(".%s-%d.nonce.json", n.Address, n.ChainId)
-	logrus.Debugf("Storing nonce info into %s", filename)
-
-	return ioutil.WriteFile(filename, data, 0600)
-}
-
-func (n *Nonce) load() error {
-	filename := fmt.Sprintf(".%s-%d.nonce.json", n.Address, n.ChainId)
-
-	logrus.Debugf("Loading nonce info from %s", filename)
-
-	data, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return err
-	}
-
-	ns := new(NonceSerializable)
-	err = json.Unmarshal(data, ns)
-	if err != nil {
-		return err
-	}
-
-	n.nonce = ns.Nonce
-	n.returnedNonces = ns.ReturnedNonces
-	n.lastUsed = ns.LastUsed
-
-	return nil
 }
 
 func (n *Nonce) autoSync(client *ethclient.Client, syncInterval time.Duration, syncAfter time.Duration) error {
@@ -224,7 +196,11 @@ func (n *Nonce) autoSync(client *ethclient.Client, syncInterval time.Duration, s
 					"address": n.Address,
 					"chainId": n.ChainId,
 				}).Info("Executing auto-sync")
-				n.Sync(client)
+				err := n.Sync(client)
+				if err != nil {
+					logrus.Errorf("AutoSync: %s\n", err)
+					return err
+				}
 			}
 			//log.Infof("clearNonce: clear all cache nonce")
 
@@ -232,12 +208,26 @@ func (n *Nonce) autoSync(client *ethclient.Client, syncInterval time.Duration, s
 	}
 }
 
-type SortedNonceArr []uint64
+func (n *Nonce) serialize() *types.NonceSerializable {
+	ns := new(types.NonceSerializable)
 
-func (arr SortedNonceArr) Less(i, j int) bool {
-	return arr[i] < arr[j]
+	ns.Address = n.Address
+	ns.ChainId = n.ChainId
+	ns.Nonce = n.nonce
+	ns.LastUsed = n.lastUsed
+	ns.ReturnedNonces = n.returnedNonces
+
+	return ns
 }
 
-func (arr SortedNonceArr) Len() int { return len(arr) }
+func (n *Nonce) deserialize(ns *types.NonceSerializable) {
+	n.Address = ns.Address
+	n.ChainId = ns.ChainId
+	n.nonce = ns.Nonce
+	n.lastUsed = ns.LastUsed
+	n.returnedNonces = ns.ReturnedNonces
+}
 
-func (arr SortedNonceArr) Swap(i, j int) { arr[i], arr[j] = arr[j], arr[i] }
+func (n *Nonce) updateLastUsed() {
+	n.lastUsed = time.Now().Unix()
+}

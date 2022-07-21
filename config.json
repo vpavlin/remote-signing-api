@@ -1,7 +1,8 @@
 {
     "server": {
         "hostname": "localhost",
-        "port": 4444
+        "port": 4444,
+        "logLevel": "debug"
     },
     "rpcUrls": [
         {
@@ -12,6 +13,10 @@
     "nonceManager": {
         "autoSync": true,
         "syncInterval": 1,
-        "syncAfter": 10
+        "syncAfter": 10,
+        "storageType": "filestorage",
+        "storageConfig": {
+            "path": "/tmp/nonces/"
+        }
     }
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/sirupsen/logrus"
 	"github.com/vpavlin/remote-signing-api/config"
+	"github.com/vpavlin/remote-signing-api/internal/nonce/storage"
 )
 
 type ChainID uint64
@@ -117,7 +118,15 @@ func (nm *NonceManager) getNonceObject(chainId ChainID, address Address) (*Nonce
 
 		syncInterval := time.Duration(nm.config.SyncInterval) * time.Second
 		syncAfter := time.Duration(nm.config.SyncAfter) * time.Second
-		nonce, err = NewNonceWithConfig(client, common.HexToAddress(string(address)), uint64(chainId), nm.config.AutoSync, syncInterval, syncAfter)
+
+		storage, err := storage.NewStorage("filestorage", nm.config.StorageConfig)
+		if err != nil {
+			return nil, err
+		}
+
+		logrus.Info(storage)
+
+		nonce, err = NewNonceWithConfig(client, &storage, common.HexToAddress(string(address)), uint64(chainId), nm.config.AutoSync, syncInterval, syncAfter)
 		if err != nil {
 			return nil, err
 		}

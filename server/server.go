@@ -42,10 +42,9 @@ func main() {
 		}
 	})
 
+	handlers.SeuptGroup(e)
+
 	//e.POST("/sign/:chainId/:address", handlers.HandleSign)
-	e.GET("/nonce/:chainId/:address", handlers.HandleGetNonce)
-	e.PUT("/nonce/:chainId/:address/:nonce", handlers.HandleReturnNonce)
-	e.POST("/nonce/:chainId/:address/sync", handlers.HandleSync)
 
 	e.Start(fmt.Sprintf("%s:%d", config.Server.Hostname, config.Server.Port))
 }
