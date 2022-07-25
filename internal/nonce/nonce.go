@@ -202,8 +202,6 @@ func (n *Nonce) autoSync(client *ethclient.Client, syncInterval time.Duration, s
 					return err
 				}
 			}
-			//log.Infof("clearNonce: clear all cache nonce")
-
 		}
 	}
 }

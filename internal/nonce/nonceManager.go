@@ -10,6 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/vpavlin/remote-signing-api/config"
 	"github.com/vpavlin/remote-signing-api/internal/nonce/storage"
+	"github.com/vpavlin/remote-signing-api/internal/types"
 )
 
 type ChainID uint64
@@ -24,6 +25,7 @@ type NonceManager struct {
 	clients     map[ChainID]*ethclient.Client
 	lock        sync.Mutex
 	config      *config.NonceManagerConfig
+	storage     *types.INonceStorage
 }
 
 func NewNonceManager(rpcUrls []config.Rpc, config *config.NonceManagerConfig) (*NonceManager, error) {
@@ -32,6 +34,11 @@ func NewNonceManager(rpcUrls []config.Rpc, config *config.NonceManagerConfig) (*
 	nm.clients = make(map[ChainID]*ethclient.Client)
 	nm.initClients(rpcUrls)
 	nm.config = config
+	storage, err := storage.NewStorage("filestorage", nm.config.StorageConfig)
+	if err != nil {
+		return nil, err
+	}
+	nm.storage = &storage
 	return nm, nil
 }
 
@@ -48,8 +55,6 @@ func (nm *NonceManager) initClients(rpcUrls []config.Rpc) error {
 }
 
 func (nm *NonceManager) GetNonce(chainId ChainID, address Address) (uint64, error) {
-	nm.lock.Lock()
-	defer nm.lock.Unlock()
 	nonce, err := nm.getNonceObject(chainId, address)
 	if err != nil {
 		return 0, err
@@ -119,14 +124,7 @@ func (nm *NonceManager) getNonceObject(chainId ChainID, address Address) (*Nonce
 		syncInterval := time.Duration(nm.config.SyncInterval) * time.Second
 		syncAfter := time.Duration(nm.config.SyncAfter) * time.Second
 
-		storage, err := storage.NewStorage("filestorage", nm.config.StorageConfig)
-		if err != nil {
-			return nil, err
-		}
-
-		logrus.Info(storage)
-
-		nonce, err = NewNonceWithConfig(client, &storage, common.HexToAddress(string(address)), uint64(chainId), nm.config.AutoSync, syncInterval, syncAfter)
+		nonce, err = NewNonceWithConfig(client, nm.storage, common.HexToAddress(string(address)), uint64(chainId), nm.config.AutoSync, syncInterval, syncAfter)
 		if err != nil {
 			return nil, err
 		}

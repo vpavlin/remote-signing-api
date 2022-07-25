@@ -22,3 +22,14 @@ func (arr SortedNonceArr) Less(i, j int) bool {
 func (arr SortedNonceArr) Len() int { return len(arr) }
 
 func (arr SortedNonceArr) Swap(i, j int) { arr[i], arr[j] = arr[j], arr[i] }
+
+type IWalletStorage interface {
+	Store(ws *WalletSerializable) error
+	Load(address string, apiKeyHashed string) (*WalletSerializable, error)
+}
+
+type WalletSerializable struct {
+	ApiKeyHashed string `json:"apiKeyHashed"`
+	PublicKey    string `json:"publicKey"`
+	PrivateKey   string `json:"privateKey"`
+}

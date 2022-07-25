@@ -2,26 +2,28 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 
-	"github.com/labstack/echo"
-	"github.com/labstack/echo/middleware"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"github.com/vpavlin/remote-signing-api/config"
 	"github.com/vpavlin/remote-signing-api/handlers"
-	"github.com/vpavlin/remote-signing-api/internal/nonce"
 
 	logrus "github.com/sirupsen/logrus"
 )
 
 func main() {
 	e := echo.New()
-
-	e.Use(middleware.Logger())
+	e.Use(
+		middleware.Recover(),   // Recover from all panics to always have your server up
+		middleware.Logger(),    // Log everything to stdout
+		middleware.RequestID(), // Generate a request id on the HTTP response headers for identification
+	)
 
 	config, err := config.NewConfig(os.Args[1])
 	if err != nil {
 		logrus.Fatal(err)
-
 	}
 
 	ll, err := logrus.ParseLevel(config.Server.LogLevel)
@@ -30,21 +32,12 @@ func main() {
 	}
 	logrus.SetLevel(ll)
 
-	nm, err := nonce.NewNonceManager(config.RpcUrls, config.NonceManager)
-	if err != nil {
-		logrus.Fatal(err)
-	}
+	handlers.SeuptNonce(e, config)
+	handlers.SetupSigner(e, config)
 
-	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			c.Set("NonceManager", nm)
-			return next(c)
-		}
+	e.GET("/api/v1/", func(ctx echo.Context) error {
+		return ctx.JSON(http.StatusOK, e.Routes())
 	})
-
-	handlers.SeuptGroup(e)
-
-	//e.POST("/sign/:chainId/:address", handlers.HandleSign)
 
 	e.Start(fmt.Sprintf("%s:%d", config.Server.Hostname, config.Server.Port))
 }

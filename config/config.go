@@ -22,12 +22,19 @@ type NonceManagerConfig struct {
 	SyncAfter     uint64      `json:"syncAfter"`
 	StorageType   string      `json:"storageType"`
 	StorageConfig interface{} `json:"storageConfig"`
+	AuthBySig     bool        `json:"authBySig"`
+}
+
+type WalletManagerConfig struct {
+	StorageType   string      `json:"storageType"`
+	StorageConfig interface{} `json:"storageConfig"`
 }
 
 type Config struct {
-	Server       *Server             `json:"server"`
-	RpcUrls      []Rpc               `json:"rpcUrls"`
-	NonceManager *NonceManagerConfig `json:"nonceManager"`
+	Server        *Server              `json:"server"`
+	RpcUrls       []Rpc                `json:"rpcUrls"`
+	NonceManager  *NonceManagerConfig  `json:"nonceManager"`
+	WalletManager *WalletManagerConfig `json:"walletManager"`
 }
 
 func NewConfig(filename string) (*Config, error) {

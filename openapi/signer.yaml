@@ -1,0 +1,116 @@
+openapi: '3.0.2'
+info:
+  version: 0.0.1
+  title: Signer
+  description: Ethereum Wallet Signer manages wallets and their private keys and signs sent data
+  contact:
+    name: Václav Pavlín
+    email: vaclav.pavlin@gmail.com
+paths:
+  /signer/new:
+    post:
+      summary: Creates new signer
+      description: Generates new wallet and maps it to a given API key
+      tags:
+      - signer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignerKey"
+
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NewSignerResponse"
+  /signer/{address}/bytes:
+    post:
+      summary: Signes bytes
+      description: Signes bytes sent in body
+      tags:
+      - signer
+      parameters:
+      - name: Authorization
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: address
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/Address"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignBytes"
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignBytesResponse"
+  /signer/{address}/key:
+    put:
+      summary: Replace the API key
+      description: This method allows the owner to rotate the API key
+      tags:
+      - signer
+      parameters:
+      - name: Authorization
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: address
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/Address"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignerKey"
+      responses:
+        200:
+          description: OK
+
+
+components:
+  schemas:
+    Address:
+      type: string
+      pattern: '^0x[a-fA-F0-9]{40}$'
+      example: "0xB2435253C71FcA27bE41206EB2793E44e1Df6b6D"
+    SignerKey:
+      type: object
+      properties:
+        key:
+          type: string
+          minLength: 32  
+    NewSignerResponse:
+      type: object
+      properties:
+        publicKey:
+          $ref: "#/components/schemas/Address"
+    SignBytes:
+      type: object
+      properties:
+        bytes:
+          type: string
+          format: byte
+    SignBytesResponse:
+      type: object
+      properties:
+        signedData:
+          type: string
+          format: byte
