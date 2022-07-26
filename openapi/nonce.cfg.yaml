@@ -1,0 +1,7 @@
+package: nonce
+generate:
+  echo-server: true
+  client: true
+  models: true
+  embedded-spec: true
+output: ../pkg/nonce/nonce.gen.go
