@@ -32,7 +32,7 @@ func main() {
 	}
 	logrus.SetLevel(ll)
 
-	handlers.SeuptNonce(e, config)
+	handlers.SetupNonce(e, config)
 	handlers.SetupSigner(e, config)
 
 	e.GET("/api/v1/", func(ctx echo.Context) error {
