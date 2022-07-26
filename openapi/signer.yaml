@@ -13,6 +13,7 @@ paths:
       description: Generates new wallet and maps it to a given API key
       tags:
       - signer
+      operationId: newSigner
       requestBody:
         required: true
         content:
@@ -26,13 +27,14 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/NewSignerResponse"
+                $ref: "#/components/schemas/NewSigner200"
   /signer/{address}/bytes:
     post:
       summary: Signes bytes
       description: Signes bytes sent in body
       tags:
       - signer
+      operationId: signBytes
       parameters:
       - name: Authorization
         in: header
@@ -56,13 +58,14 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SignBytesResponse"
+                $ref: "#/components/schemas/SignBytes200"
   /signer/{address}/key:
     put:
       summary: Replace the API key
       description: This method allows the owner to rotate the API key
       tags:
       - signer
+      operationId: replaceKey
       parameters:
       - name: Authorization
         in: header
@@ -97,7 +100,7 @@ components:
         key:
           type: string
           minLength: 32  
-    NewSignerResponse:
+    NewSigner200:
       type: object
       properties:
         publicKey:
@@ -108,7 +111,7 @@ components:
         bytes:
           type: string
           format: byte
-    SignBytesResponse:
+    SignBytes200:
       type: object
       properties:
         signedData:

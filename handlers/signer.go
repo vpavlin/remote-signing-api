@@ -54,14 +54,12 @@ func SetupSigner(e *echo.Echo, config *config.Config) {
 	signer.RegisterHandlers(g, SignerHandlers{})
 }
 
-func (sh SignerHandlers) PostSignerNew(ctx echo.Context) error {
+func (sh SignerHandlers) NewSigner(ctx echo.Context) error {
 	ns := new(signer.SignerKey)
 	err := ctx.Bind(ns)
 	if err != nil {
 		return err
 	}
-
-	logrus.Debugf("Key: %s", ns.Key)
 
 	wm := ctx.Get("WalletManager").(*wallet.WalletManager)
 
@@ -71,18 +69,18 @@ func (sh SignerHandlers) PostSignerNew(ctx echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
-	resp := new(signer.NewSignerResponse)
+	resp := new(signer.NewSigner200)
 	pk := w.PublicKey.String()
 	resp.PublicKey = &pk
 
 	return ctx.JSON(http.StatusOK, resp)
 }
 
-func (sn SignerHandlers) PostSignerAddressBytes(ctx echo.Context, address signer.Address, params signer.PostSignerAddressBytesParams) error {
+func (sn SignerHandlers) SignBytes(ctx echo.Context, address signer.Address, params signer.SignBytesParams) error {
 	bearer := params.Authorization
-	key := bearer[7:]
+	apiKey := bearer[7:]
 
-	data := new(signer.PostSignerAddressBytesJSONRequestBody)
+	data := new(signer.SignBytesJSONRequestBody)
 
 	err := ctx.Bind(data)
 	if err != nil {
@@ -93,7 +91,7 @@ func (sn SignerHandlers) PostSignerAddressBytes(ctx echo.Context, address signer
 
 	wm := ctx.Get("WalletManager").(*wallet.WalletManager)
 
-	wallet, err := wm.GetByAddress(key, publicKey)
+	wallet, err := wm.GetByAddress(apiKey, publicKey)
 	if err != nil {
 		return err
 	}
@@ -103,18 +101,18 @@ func (sn SignerHandlers) PostSignerAddressBytes(ctx echo.Context, address signer
 		return err
 	}
 
-	rtx := new(signer.SignBytesResponse)
+	rtx := new(signer.SignBytes200)
 	signedData := signature
 	rtx.SignedData = &signedData
 
 	return ctx.JSON(http.StatusOK, rtx)
 }
 
-func (sn SignerHandlers) PutSignerAddressKey(ctx echo.Context, address signer.Address, params signer.PutSignerAddressKeyParams) error {
+func (sn SignerHandlers) ReplaceKey(ctx echo.Context, address signer.Address, params signer.ReplaceKeyParams) error {
 	bearer := params.Authorization
-	key := bearer[7:]
+	apiKey := bearer[7:]
 
-	data := new(signer.PutSignerAddressKeyJSONRequestBody)
+	data := new(signer.ReplaceKeyJSONRequestBody)
 
 	err := ctx.Bind(data)
 	if err != nil {
@@ -126,7 +124,7 @@ func (sn SignerHandlers) PutSignerAddressKey(ctx echo.Context, address signer.Ad
 	publicKey := common.HexToAddress(address)
 	logrus.Debugf("Updating address %s", address)
 
-	wallet, err := wm.GetByAddress(key, publicKey)
+	wallet, err := wm.GetByAddress(apiKey, publicKey)
 	if err != nil {
 		return err
 	}

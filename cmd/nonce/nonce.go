@@ -12,11 +12,13 @@ type NonceArgs struct {
 	Address string `short:"a" description:"Public key of the signer" required:"true"`
 	Key     string `short:"k" description:"API Key for the signing service" required:"true"`
 	Action  string `long:"action" description:"Action to perform" required:"true"`
+	Server  string `long:"server" description:"Signer Server URL" default:"http://localhost:4444"`
 }
+
+var opts NonceArgs
 
 func main() {
 
-	var opts NonceArgs
 	var err error
 
 	parser := flags.NewParser(&opts, flags.Default)
@@ -38,16 +40,20 @@ func main() {
 }
 
 func getNonce(chainId uint64, address string, apiKey string) error {
-	client, err := nonce.NewNonceClientWithSigner("http://localhost:4444")
+	client, err := nonce.NewNonceClientWithSigner(opts.Server)
 	if err != nil {
 		return err
 	}
 
-	nonce, err := client.GetNonceWithSigner(chainId, address, apiKey)
+	nonce, nonceReturnFN, err := client.GetNonceWithSigner(chainId, address, apiKey)
 	if err != nil {
+		nonceReturnFN()
 		return err
 	}
 
 	log.Println("Got nonce: ", nonce)
+
+	//nonceReturnFN()
+
 	return nil
 }

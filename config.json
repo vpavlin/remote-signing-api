@@ -17,13 +17,13 @@
         "syncAfter": 10,
         "storageType": "filestorage",
         "storageConfig": {
-            "path": "/tmp/nonces/"
+            "path": "./tmp/nonces/"
         }
     },
     "walletManager": {
         "storageType": "filestorage",
         "storageConfig": {
-            "path": "/tmp/signer/"
+            "path": "./tmp/signer/"
         }
     }
 }

@@ -19,8 +19,7 @@ type Wallet struct {
 	PublicKey common.Address
 
 	privateKey *ecdsa.PrivateKey
-
-	storage iTypes.IWalletStorage
+	storage    iTypes.IWalletStorage
 }
 
 func NewKey() (*ecdsa.PrivateKey, error) {

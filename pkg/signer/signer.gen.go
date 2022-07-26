@@ -25,8 +25,8 @@ import (
 // Address defines model for Address.
 type Address = string
 
-// NewSignerResponse defines model for NewSignerResponse.
-type NewSignerResponse struct {
+// NewSigner200 defines model for NewSigner200.
+type NewSigner200 struct {
 	PublicKey *Address `json:"publicKey,omitempty"`
 }
 
@@ -35,8 +35,8 @@ type SignBytes struct {
 	Bytes *[]byte `json:"bytes,omitempty"`
 }
 
-// SignBytesResponse defines model for SignBytesResponse.
-type SignBytesResponse struct {
+// SignBytes200 defines model for SignBytes200.
+type SignBytes200 struct {
 	SignedData *[]byte `json:"signedData,omitempty"`
 }
 
@@ -45,33 +45,33 @@ type SignerKey struct {
 	Key *string `json:"key,omitempty"`
 }
 
-// PostSignerNewJSONBody defines parameters for PostSignerNew.
-type PostSignerNewJSONBody = SignerKey
+// NewSignerJSONBody defines parameters for NewSigner.
+type NewSignerJSONBody = SignerKey
 
-// PostSignerAddressBytesJSONBody defines parameters for PostSignerAddressBytes.
-type PostSignerAddressBytesJSONBody = SignBytes
+// SignBytesJSONBody defines parameters for SignBytes.
+type SignBytesJSONBody = SignBytes
 
-// PostSignerAddressBytesParams defines parameters for PostSignerAddressBytes.
-type PostSignerAddressBytesParams struct {
+// SignBytesParams defines parameters for SignBytes.
+type SignBytesParams struct {
 	Authorization string `json:"Authorization"`
 }
 
-// PutSignerAddressKeyJSONBody defines parameters for PutSignerAddressKey.
-type PutSignerAddressKeyJSONBody = SignerKey
+// ReplaceKeyJSONBody defines parameters for ReplaceKey.
+type ReplaceKeyJSONBody = SignerKey
 
-// PutSignerAddressKeyParams defines parameters for PutSignerAddressKey.
-type PutSignerAddressKeyParams struct {
+// ReplaceKeyParams defines parameters for ReplaceKey.
+type ReplaceKeyParams struct {
 	Authorization string `json:"Authorization"`
 }
 
-// PostSignerNewJSONRequestBody defines body for PostSignerNew for application/json ContentType.
-type PostSignerNewJSONRequestBody = PostSignerNewJSONBody
+// NewSignerJSONRequestBody defines body for NewSigner for application/json ContentType.
+type NewSignerJSONRequestBody = NewSignerJSONBody
 
-// PostSignerAddressBytesJSONRequestBody defines body for PostSignerAddressBytes for application/json ContentType.
-type PostSignerAddressBytesJSONRequestBody = PostSignerAddressBytesJSONBody
+// SignBytesJSONRequestBody defines body for SignBytes for application/json ContentType.
+type SignBytesJSONRequestBody = SignBytesJSONBody
 
-// PutSignerAddressKeyJSONRequestBody defines body for PutSignerAddressKey for application/json ContentType.
-type PutSignerAddressKeyJSONRequestBody = PutSignerAddressKeyJSONBody
+// ReplaceKeyJSONRequestBody defines body for ReplaceKey for application/json ContentType.
+type ReplaceKeyJSONRequestBody = ReplaceKeyJSONBody
 
 // RequestEditorFn  is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -146,24 +146,24 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
-	// PostSignerNew request with any body
-	PostSignerNewWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// NewSigner request with any body
+	NewSignerWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PostSignerNew(ctx context.Context, body PostSignerNewJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	NewSigner(ctx context.Context, body NewSignerJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PostSignerAddressBytes request with any body
-	PostSignerAddressBytesWithBody(ctx context.Context, address Address, params *PostSignerAddressBytesParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// SignBytes request with any body
+	SignBytesWithBody(ctx context.Context, address Address, params *SignBytesParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PostSignerAddressBytes(ctx context.Context, address Address, params *PostSignerAddressBytesParams, body PostSignerAddressBytesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	SignBytes(ctx context.Context, address Address, params *SignBytesParams, body SignBytesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PutSignerAddressKey request with any body
-	PutSignerAddressKeyWithBody(ctx context.Context, address Address, params *PutSignerAddressKeyParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// ReplaceKey request with any body
+	ReplaceKeyWithBody(ctx context.Context, address Address, params *ReplaceKeyParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PutSignerAddressKey(ctx context.Context, address Address, params *PutSignerAddressKeyParams, body PutSignerAddressKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ReplaceKey(ctx context.Context, address Address, params *ReplaceKeyParams, body ReplaceKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
-func (c *Client) PostSignerNewWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostSignerNewRequestWithBody(c.Server, contentType, body)
+func (c *Client) NewSignerWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewNewSignerRequestWithBody(c.Server, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -174,8 +174,8 @@ func (c *Client) PostSignerNewWithBody(ctx context.Context, contentType string, 
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostSignerNew(ctx context.Context, body PostSignerNewJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostSignerNewRequest(c.Server, body)
+func (c *Client) NewSigner(ctx context.Context, body NewSignerJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewNewSignerRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -186,8 +186,8 @@ func (c *Client) PostSignerNew(ctx context.Context, body PostSignerNewJSONReques
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostSignerAddressBytesWithBody(ctx context.Context, address Address, params *PostSignerAddressBytesParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostSignerAddressBytesRequestWithBody(c.Server, address, params, contentType, body)
+func (c *Client) SignBytesWithBody(ctx context.Context, address Address, params *SignBytesParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSignBytesRequestWithBody(c.Server, address, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -198,8 +198,8 @@ func (c *Client) PostSignerAddressBytesWithBody(ctx context.Context, address Add
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostSignerAddressBytes(ctx context.Context, address Address, params *PostSignerAddressBytesParams, body PostSignerAddressBytesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostSignerAddressBytesRequest(c.Server, address, params, body)
+func (c *Client) SignBytes(ctx context.Context, address Address, params *SignBytesParams, body SignBytesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSignBytesRequest(c.Server, address, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -210,8 +210,8 @@ func (c *Client) PostSignerAddressBytes(ctx context.Context, address Address, pa
 	return c.Client.Do(req)
 }
 
-func (c *Client) PutSignerAddressKeyWithBody(ctx context.Context, address Address, params *PutSignerAddressKeyParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPutSignerAddressKeyRequestWithBody(c.Server, address, params, contentType, body)
+func (c *Client) ReplaceKeyWithBody(ctx context.Context, address Address, params *ReplaceKeyParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReplaceKeyRequestWithBody(c.Server, address, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -222,8 +222,8 @@ func (c *Client) PutSignerAddressKeyWithBody(ctx context.Context, address Addres
 	return c.Client.Do(req)
 }
 
-func (c *Client) PutSignerAddressKey(ctx context.Context, address Address, params *PutSignerAddressKeyParams, body PutSignerAddressKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPutSignerAddressKeyRequest(c.Server, address, params, body)
+func (c *Client) ReplaceKey(ctx context.Context, address Address, params *ReplaceKeyParams, body ReplaceKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReplaceKeyRequest(c.Server, address, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -234,19 +234,19 @@ func (c *Client) PutSignerAddressKey(ctx context.Context, address Address, param
 	return c.Client.Do(req)
 }
 
-// NewPostSignerNewRequest calls the generic PostSignerNew builder with application/json body
-func NewPostSignerNewRequest(server string, body PostSignerNewJSONRequestBody) (*http.Request, error) {
+// NewNewSignerRequest calls the generic NewSigner builder with application/json body
+func NewNewSignerRequest(server string, body NewSignerJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewPostSignerNewRequestWithBody(server, "application/json", bodyReader)
+	return NewNewSignerRequestWithBody(server, "application/json", bodyReader)
 }
 
-// NewPostSignerNewRequestWithBody generates requests for PostSignerNew with any type of body
-func NewPostSignerNewRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+// NewNewSignerRequestWithBody generates requests for NewSigner with any type of body
+func NewNewSignerRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -274,19 +274,19 @@ func NewPostSignerNewRequestWithBody(server string, contentType string, body io.
 	return req, nil
 }
 
-// NewPostSignerAddressBytesRequest calls the generic PostSignerAddressBytes builder with application/json body
-func NewPostSignerAddressBytesRequest(server string, address Address, params *PostSignerAddressBytesParams, body PostSignerAddressBytesJSONRequestBody) (*http.Request, error) {
+// NewSignBytesRequest calls the generic SignBytes builder with application/json body
+func NewSignBytesRequest(server string, address Address, params *SignBytesParams, body SignBytesJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewPostSignerAddressBytesRequestWithBody(server, address, params, "application/json", bodyReader)
+	return NewSignBytesRequestWithBody(server, address, params, "application/json", bodyReader)
 }
 
-// NewPostSignerAddressBytesRequestWithBody generates requests for PostSignerAddressBytes with any type of body
-func NewPostSignerAddressBytesRequestWithBody(server string, address Address, params *PostSignerAddressBytesParams, contentType string, body io.Reader) (*http.Request, error) {
+// NewSignBytesRequestWithBody generates requests for SignBytes with any type of body
+func NewSignBytesRequestWithBody(server string, address Address, params *SignBytesParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -330,19 +330,19 @@ func NewPostSignerAddressBytesRequestWithBody(server string, address Address, pa
 	return req, nil
 }
 
-// NewPutSignerAddressKeyRequest calls the generic PutSignerAddressKey builder with application/json body
-func NewPutSignerAddressKeyRequest(server string, address Address, params *PutSignerAddressKeyParams, body PutSignerAddressKeyJSONRequestBody) (*http.Request, error) {
+// NewReplaceKeyRequest calls the generic ReplaceKey builder with application/json body
+func NewReplaceKeyRequest(server string, address Address, params *ReplaceKeyParams, body ReplaceKeyJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewPutSignerAddressKeyRequestWithBody(server, address, params, "application/json", bodyReader)
+	return NewReplaceKeyRequestWithBody(server, address, params, "application/json", bodyReader)
 }
 
-// NewPutSignerAddressKeyRequestWithBody generates requests for PutSignerAddressKey with any type of body
-func NewPutSignerAddressKeyRequestWithBody(server string, address Address, params *PutSignerAddressKeyParams, contentType string, body io.Reader) (*http.Request, error) {
+// NewReplaceKeyRequestWithBody generates requests for ReplaceKey with any type of body
+func NewReplaceKeyRequestWithBody(server string, address Address, params *ReplaceKeyParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -429,30 +429,30 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
-	// PostSignerNew request with any body
-	PostSignerNewWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostSignerNewResponse, error)
+	// NewSigner request with any body
+	NewSignerWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*NewSignerResponse, error)
 
-	PostSignerNewWithResponse(ctx context.Context, body PostSignerNewJSONRequestBody, reqEditors ...RequestEditorFn) (*PostSignerNewResponse, error)
+	NewSignerWithResponse(ctx context.Context, body NewSignerJSONRequestBody, reqEditors ...RequestEditorFn) (*NewSignerResponse, error)
 
-	// PostSignerAddressBytes request with any body
-	PostSignerAddressBytesWithBodyWithResponse(ctx context.Context, address Address, params *PostSignerAddressBytesParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostSignerAddressBytesResponse, error)
+	// SignBytes request with any body
+	SignBytesWithBodyWithResponse(ctx context.Context, address Address, params *SignBytesParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SignBytesResponse, error)
 
-	PostSignerAddressBytesWithResponse(ctx context.Context, address Address, params *PostSignerAddressBytesParams, body PostSignerAddressBytesJSONRequestBody, reqEditors ...RequestEditorFn) (*PostSignerAddressBytesResponse, error)
+	SignBytesWithResponse(ctx context.Context, address Address, params *SignBytesParams, body SignBytesJSONRequestBody, reqEditors ...RequestEditorFn) (*SignBytesResponse, error)
 
-	// PutSignerAddressKey request with any body
-	PutSignerAddressKeyWithBodyWithResponse(ctx context.Context, address Address, params *PutSignerAddressKeyParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutSignerAddressKeyResponse, error)
+	// ReplaceKey request with any body
+	ReplaceKeyWithBodyWithResponse(ctx context.Context, address Address, params *ReplaceKeyParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceKeyResponse, error)
 
-	PutSignerAddressKeyWithResponse(ctx context.Context, address Address, params *PutSignerAddressKeyParams, body PutSignerAddressKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*PutSignerAddressKeyResponse, error)
+	ReplaceKeyWithResponse(ctx context.Context, address Address, params *ReplaceKeyParams, body ReplaceKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceKeyResponse, error)
 }
 
-type PostSignerNewResponse struct {
+type NewSignerResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *NewSignerResponse
+	JSON200      *NewSigner200
 }
 
 // Status returns HTTPResponse.Status
-func (r PostSignerNewResponse) Status() string {
+func (r NewSignerResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -460,21 +460,21 @@ func (r PostSignerNewResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r PostSignerNewResponse) StatusCode() int {
+func (r NewSignerResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type PostSignerAddressBytesResponse struct {
+type SignBytesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *SignBytesResponse
+	JSON200      *SignBytes200
 }
 
 // Status returns HTTPResponse.Status
-func (r PostSignerAddressBytesResponse) Status() string {
+func (r SignBytesResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -482,20 +482,20 @@ func (r PostSignerAddressBytesResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r PostSignerAddressBytesResponse) StatusCode() int {
+func (r SignBytesResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type PutSignerAddressKeyResponse struct {
+type ReplaceKeyResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 }
 
 // Status returns HTTPResponse.Status
-func (r PutSignerAddressKeyResponse) Status() string {
+func (r ReplaceKeyResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -503,80 +503,80 @@ func (r PutSignerAddressKeyResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r PutSignerAddressKeyResponse) StatusCode() int {
+func (r ReplaceKeyResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-// PostSignerNewWithBodyWithResponse request with arbitrary body returning *PostSignerNewResponse
-func (c *ClientWithResponses) PostSignerNewWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostSignerNewResponse, error) {
-	rsp, err := c.PostSignerNewWithBody(ctx, contentType, body, reqEditors...)
+// NewSignerWithBodyWithResponse request with arbitrary body returning *NewSignerResponse
+func (c *ClientWithResponses) NewSignerWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*NewSignerResponse, error) {
+	rsp, err := c.NewSignerWithBody(ctx, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostSignerNewResponse(rsp)
+	return ParseNewSignerResponse(rsp)
 }
 
-func (c *ClientWithResponses) PostSignerNewWithResponse(ctx context.Context, body PostSignerNewJSONRequestBody, reqEditors ...RequestEditorFn) (*PostSignerNewResponse, error) {
-	rsp, err := c.PostSignerNew(ctx, body, reqEditors...)
+func (c *ClientWithResponses) NewSignerWithResponse(ctx context.Context, body NewSignerJSONRequestBody, reqEditors ...RequestEditorFn) (*NewSignerResponse, error) {
+	rsp, err := c.NewSigner(ctx, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostSignerNewResponse(rsp)
+	return ParseNewSignerResponse(rsp)
 }
 
-// PostSignerAddressBytesWithBodyWithResponse request with arbitrary body returning *PostSignerAddressBytesResponse
-func (c *ClientWithResponses) PostSignerAddressBytesWithBodyWithResponse(ctx context.Context, address Address, params *PostSignerAddressBytesParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostSignerAddressBytesResponse, error) {
-	rsp, err := c.PostSignerAddressBytesWithBody(ctx, address, params, contentType, body, reqEditors...)
+// SignBytesWithBodyWithResponse request with arbitrary body returning *SignBytesResponse
+func (c *ClientWithResponses) SignBytesWithBodyWithResponse(ctx context.Context, address Address, params *SignBytesParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SignBytesResponse, error) {
+	rsp, err := c.SignBytesWithBody(ctx, address, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostSignerAddressBytesResponse(rsp)
+	return ParseSignBytesResponse(rsp)
 }
 
-func (c *ClientWithResponses) PostSignerAddressBytesWithResponse(ctx context.Context, address Address, params *PostSignerAddressBytesParams, body PostSignerAddressBytesJSONRequestBody, reqEditors ...RequestEditorFn) (*PostSignerAddressBytesResponse, error) {
-	rsp, err := c.PostSignerAddressBytes(ctx, address, params, body, reqEditors...)
+func (c *ClientWithResponses) SignBytesWithResponse(ctx context.Context, address Address, params *SignBytesParams, body SignBytesJSONRequestBody, reqEditors ...RequestEditorFn) (*SignBytesResponse, error) {
+	rsp, err := c.SignBytes(ctx, address, params, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostSignerAddressBytesResponse(rsp)
+	return ParseSignBytesResponse(rsp)
 }
 
-// PutSignerAddressKeyWithBodyWithResponse request with arbitrary body returning *PutSignerAddressKeyResponse
-func (c *ClientWithResponses) PutSignerAddressKeyWithBodyWithResponse(ctx context.Context, address Address, params *PutSignerAddressKeyParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutSignerAddressKeyResponse, error) {
-	rsp, err := c.PutSignerAddressKeyWithBody(ctx, address, params, contentType, body, reqEditors...)
+// ReplaceKeyWithBodyWithResponse request with arbitrary body returning *ReplaceKeyResponse
+func (c *ClientWithResponses) ReplaceKeyWithBodyWithResponse(ctx context.Context, address Address, params *ReplaceKeyParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceKeyResponse, error) {
+	rsp, err := c.ReplaceKeyWithBody(ctx, address, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePutSignerAddressKeyResponse(rsp)
+	return ParseReplaceKeyResponse(rsp)
 }
 
-func (c *ClientWithResponses) PutSignerAddressKeyWithResponse(ctx context.Context, address Address, params *PutSignerAddressKeyParams, body PutSignerAddressKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*PutSignerAddressKeyResponse, error) {
-	rsp, err := c.PutSignerAddressKey(ctx, address, params, body, reqEditors...)
+func (c *ClientWithResponses) ReplaceKeyWithResponse(ctx context.Context, address Address, params *ReplaceKeyParams, body ReplaceKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceKeyResponse, error) {
+	rsp, err := c.ReplaceKey(ctx, address, params, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePutSignerAddressKeyResponse(rsp)
+	return ParseReplaceKeyResponse(rsp)
 }
 
-// ParsePostSignerNewResponse parses an HTTP response from a PostSignerNewWithResponse call
-func ParsePostSignerNewResponse(rsp *http.Response) (*PostSignerNewResponse, error) {
+// ParseNewSignerResponse parses an HTTP response from a NewSignerWithResponse call
+func ParseNewSignerResponse(rsp *http.Response) (*NewSignerResponse, error) {
 	bodyBytes, err := ioutil.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PostSignerNewResponse{
+	response := &NewSignerResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest NewSignerResponse
+		var dest NewSigner200
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -587,22 +587,22 @@ func ParsePostSignerNewResponse(rsp *http.Response) (*PostSignerNewResponse, err
 	return response, nil
 }
 
-// ParsePostSignerAddressBytesResponse parses an HTTP response from a PostSignerAddressBytesWithResponse call
-func ParsePostSignerAddressBytesResponse(rsp *http.Response) (*PostSignerAddressBytesResponse, error) {
+// ParseSignBytesResponse parses an HTTP response from a SignBytesWithResponse call
+func ParseSignBytesResponse(rsp *http.Response) (*SignBytesResponse, error) {
 	bodyBytes, err := ioutil.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PostSignerAddressBytesResponse{
+	response := &SignBytesResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest SignBytesResponse
+		var dest SignBytes200
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -613,15 +613,15 @@ func ParsePostSignerAddressBytesResponse(rsp *http.Response) (*PostSignerAddress
 	return response, nil
 }
 
-// ParsePutSignerAddressKeyResponse parses an HTTP response from a PutSignerAddressKeyWithResponse call
-func ParsePutSignerAddressKeyResponse(rsp *http.Response) (*PutSignerAddressKeyResponse, error) {
+// ParseReplaceKeyResponse parses an HTTP response from a ReplaceKeyWithResponse call
+func ParseReplaceKeyResponse(rsp *http.Response) (*ReplaceKeyResponse, error) {
 	bodyBytes, err := ioutil.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PutSignerAddressKeyResponse{
+	response := &ReplaceKeyResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -633,13 +633,13 @@ func ParsePutSignerAddressKeyResponse(rsp *http.Response) (*PutSignerAddressKeyR
 type ServerInterface interface {
 	// Creates new signer
 	// (POST /signer/new)
-	PostSignerNew(ctx echo.Context) error
+	NewSigner(ctx echo.Context) error
 	// Signes bytes
 	// (POST /signer/{address}/bytes)
-	PostSignerAddressBytes(ctx echo.Context, address Address, params PostSignerAddressBytesParams) error
+	SignBytes(ctx echo.Context, address Address, params SignBytesParams) error
 	// Replace the API key
 	// (PUT /signer/{address}/key)
-	PutSignerAddressKey(ctx echo.Context, address Address, params PutSignerAddressKeyParams) error
+	ReplaceKey(ctx echo.Context, address Address, params ReplaceKeyParams) error
 }
 
 // ServerInterfaceWrapper converts echo contexts to parameters.
@@ -647,17 +647,17 @@ type ServerInterfaceWrapper struct {
 	Handler ServerInterface
 }
 
-// PostSignerNew converts echo context to params.
-func (w *ServerInterfaceWrapper) PostSignerNew(ctx echo.Context) error {
+// NewSigner converts echo context to params.
+func (w *ServerInterfaceWrapper) NewSigner(ctx echo.Context) error {
 	var err error
 
 	// Invoke the callback with all the unmarshalled arguments
-	err = w.Handler.PostSignerNew(ctx)
+	err = w.Handler.NewSigner(ctx)
 	return err
 }
 
-// PostSignerAddressBytes converts echo context to params.
-func (w *ServerInterfaceWrapper) PostSignerAddressBytes(ctx echo.Context) error {
+// SignBytes converts echo context to params.
+func (w *ServerInterfaceWrapper) SignBytes(ctx echo.Context) error {
 	var err error
 	// ------------- Path parameter "address" -------------
 	var address Address
@@ -668,7 +668,7 @@ func (w *ServerInterfaceWrapper) PostSignerAddressBytes(ctx echo.Context) error 
 	}
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params PostSignerAddressBytesParams
+	var params SignBytesParams
 
 	headers := ctx.Request().Header
 	// ------------- Required header parameter "Authorization" -------------
@@ -690,12 +690,12 @@ func (w *ServerInterfaceWrapper) PostSignerAddressBytes(ctx echo.Context) error 
 	}
 
 	// Invoke the callback with all the unmarshalled arguments
-	err = w.Handler.PostSignerAddressBytes(ctx, address, params)
+	err = w.Handler.SignBytes(ctx, address, params)
 	return err
 }
 
-// PutSignerAddressKey converts echo context to params.
-func (w *ServerInterfaceWrapper) PutSignerAddressKey(ctx echo.Context) error {
+// ReplaceKey converts echo context to params.
+func (w *ServerInterfaceWrapper) ReplaceKey(ctx echo.Context) error {
 	var err error
 	// ------------- Path parameter "address" -------------
 	var address Address
@@ -706,7 +706,7 @@ func (w *ServerInterfaceWrapper) PutSignerAddressKey(ctx echo.Context) error {
 	}
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params PutSignerAddressKeyParams
+	var params ReplaceKeyParams
 
 	headers := ctx.Request().Header
 	// ------------- Required header parameter "Authorization" -------------
@@ -728,7 +728,7 @@ func (w *ServerInterfaceWrapper) PutSignerAddressKey(ctx echo.Context) error {
 	}
 
 	// Invoke the callback with all the unmarshalled arguments
-	err = w.Handler.PutSignerAddressKey(ctx, address, params)
+	err = w.Handler.ReplaceKey(ctx, address, params)
 	return err
 }
 
@@ -760,28 +760,28 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 		Handler: si,
 	}
 
-	router.POST(baseURL+"/signer/new", wrapper.PostSignerNew)
-	router.POST(baseURL+"/signer/:address/bytes", wrapper.PostSignerAddressBytes)
-	router.PUT(baseURL+"/signer/:address/key", wrapper.PutSignerAddressKey)
+	router.POST(baseURL+"/signer/new", wrapper.NewSigner)
+	router.POST(baseURL+"/signer/:address/bytes", wrapper.SignBytes)
+	router.PUT(baseURL+"/signer/:address/key", wrapper.ReplaceKey)
 
 }
 
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/+xUW27rNhDdCjG9n4oty74Jrr5q3zhFkCIN0qL9CFJgLI0tJhLJkiM7ruHFdAFdRTZW",
-	"kJKTOM7DQNN+3T9pQJ5z5szhrCDTldGKFDtIV+CygioMn8M8t+TCJ91hZUqCFOK7UTLof04+978e9U6y",
-	"YXI0GQ96SXw4HiVHX/rjwYB6x9PDyeExRGCQmayCFH6P767wYDo8OIkPvlyvBvH6E0TAS+MxHVupZrCO",
-	"4JwWP8uZIntJzmjlyJMbqw1ZlhSkmHpSyuyMlv7nk6UppPBd97GJbttBdyN/vX4g0pMbytgTeZbRklvI",
-	"LYLJpjzVtkKGNFR21b4J+7p+5/vLj5HxX3CQbQ3Yxr5tipVUP5KacQFpP9kD05ekmmp/N9OKMeMw9Apl",
-	"CSnMMStx3jE4L6X6fuarnUxXEIHCyuP8ev+XPyEucF7e/628yJxcZqVhqf30x1yQpboSv2FZEoumBVGh",
-	"whk5sQhVJ1DlgguSVhgr58gkbmnZlL1rTjhSLHJvXQQsOQSywYII5mRdQxd34k7Pq9CGFBoJKfQ7cSdp",
-	"ElkEq7phDraraBF81C70vK37B1JkkckJRYtWZpBToXFCsmAtUMzknJQYXpx6uRBYLXqE0xxSuNCOG43n",
-	"tIAILP1Rk+ORzpcbv0kFbjSmlFm42b1xXsDmOb4X9cdIhFl6Cmkph5RtTaHQpDF0nsTxhxHvvtcgYNvF",
-	"n85C6FxdVWiXkMJXSw+mus34GGcO0itoC9f+ymZIK2ze8rr78DhfHlgQ40Q41aRFKjHxVr8+lnZPNNvA",
-	"J8RiRUzWq1mB9LAFYR5EtoEf1lxoK/8McPDc8OiJeTtvr0X0OXzEa9t7E2m/VXf93wWsMeh/DtjuQt0n",
-	"YE9jsHe02uVp6hdy9UshnaiIC50LLEu9cH5RCb3wa4y1sJr9uvK1V/dAvZ23s3DmW9o+aJ29k4hLMiVm",
-	"zye0G4z1+p8AAAD//01q56oRCQAA",
+	"H4sIAAAAAAAC/+xUUU7jSBC9SquWT5M4TgDhr00grBCrXbS72v1ArFSxK3GD3d3TXUnIRDnMHGBOwcVG",
+	"3XYIAQYiDTNf8+dU7PdevXpVS8h0ZbQixQ7SJbisoArDYz/PLbnwSHdYmZIghfhukPS6B8lB9+Soc5b1",
+	"k6PRsNdJ4sPhIDk67g57Peqcjg9Hh6cQgUFmsgpS+D++u8L9cX//LN4/vl724tUeRMAL4zEdW6kmsIrg",
+	"D5r/LSeKbBLHntdYbciypKDCTEelzC5o4X/sWRpDCr+0N/rbjfj2Wvlq9cChRzeUsefwBIMFN5BbBKN1",
+	"eaxthQxpqDwX+irsi9Kd7yo/RcZvgCfb9L6NfVsXK6l+JzXhAtJusgOmL0k11v7bTCvGjMOoK5QlpDDD",
+	"rMRZy+CslOrXia+2Ml1BBAorj/Pv/Sf/hrjEWXn/WXmRObnMSsNS+5kPuSBL00r8h2VJLOoWRIUKJ+TE",
+	"PFSdQJULLkhaYaycIZO4pUVd9q454UixyL11EbDkEMMaCyKYkXU1XdyKWx2vQhtSaCSk0G3FraTOYRGs",
+	"aoc52LaiefBRu9Dztu7fSJFFJicUzRuZQU6FxgnJgrVAMZEzUqJ/ee7lQmC16BHOc0g3QYYILH2YkuOB",
+	"zhdrr0kFXjSmlFn4qn3jPPl6Ad9K+CYOYY6eQlrKIWU7pVBwRitXB6RJ5LsQb21o4N4278+LkDU3rSq0",
+	"C0jhxNKDl25tCePEQXoFTeHaf7KezRLr7V21H9bx5TkFHU6Et+qQSCVG3uWn09isvM+CxYqYrBewBOmR",
+	"CsI86Gqi3Z9yoa38GBDgqb3RI6uebVmD6BO3wWs6ehVpt3t2/f3iVBv0g+O0dTV3idPjoe8cpOZCmukL",
+	"KfqnkE5UxIXOBZalnjt/jYSe+1vFWljN/ib52teW/S8yJWZ0Ef76ma93OldvBKEx/clgnudhtfoSAAD/",
+	"/+EgNMvjCAAA",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

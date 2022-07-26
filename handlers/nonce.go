@@ -18,7 +18,7 @@ type ErrorResponse struct {
 
 type NonceHandler struct{}
 
-func SeuptNonce(e *echo.Echo, config *config.Config) {
+func SetupNonce(e *echo.Echo, config *config.Config) {
 	g := e.Group("")
 
 	nm, err := nonce.NewNonceManager(config.RpcUrls, config.NonceManager)
@@ -33,42 +33,44 @@ func SeuptNonce(e *echo.Echo, config *config.Config) {
 		}
 	})
 
-	g.Use(middleware.KeyAuthWithConfig(middleware.KeyAuthConfig{
-		KeyLookup: "header:X-NONCE-AUTH-HASH",
-		Validator: func(hash string, ctx echo.Context) (bool, error) {
-			address := ctx.Request().Header.Get("X-NONCE-AUTH-SIGNER")
-			signature := ctx.Request().Header.Get("X-NONCE-AUTH-SIGNATURE")
+	if config.NonceManager.AuthBySig {
+		g.Use(middleware.KeyAuthWithConfig(middleware.KeyAuthConfig{
+			KeyLookup: "header:X-NONCE-AUTH-HASH",
+			Validator: func(hash string, ctx echo.Context) (bool, error) {
+				address := ctx.Request().Header.Get("X-NONCE-AUTH-SIGNER")
+				signature := ctx.Request().Header.Get("X-NONCE-AUTH-SIGNATURE")
 
-			nonceAddress := ctx.Param("address")
-			if len(nonceAddress) > 0 {
-				if nonceAddress != address {
-					return false, nil
+				nonceAddress := ctx.Param("address")
+				if len(nonceAddress) > 0 {
+					if nonceAddress != address {
+						return false, nil
+					}
 				}
-			}
 
-			hashBytes, err := signer.StringToBytes(hash)
-			if err != nil {
-				return false, err
-			}
+				hashBytes, err := signer.StringToBytes(hash)
+				if err != nil {
+					return false, err
+				}
 
-			sigBytes, err := signer.StringToBytes(signature)
-			if err != nil {
-				return false, err
-			}
+				sigBytes, err := signer.StringToBytes(signature)
+				if err != nil {
+					return false, err
+				}
 
-			ok, err := signer.IsValidSignature(address, hashBytes, sigBytes)
-			if err != nil {
-				return false, err
-			}
+				ok, err := signer.IsValidSignature(address, hashBytes, sigBytes)
+				if err != nil {
+					return false, err
+				}
 
-			if ok {
-				return true, nil
-			}
+				if ok {
+					return true, nil
+				}
 
-			return false, nil
+				return false, nil
 
-		},
-	}))
+			},
+		}))
+	}
 
 	nh := new(NonceHandler)
 
@@ -93,7 +95,7 @@ func (nh NonceHandler) GetNonce(ctx echo.Context, chainId uint64, address string
 	return ctx.JSON(http.StatusOK, resp)
 }
 
-func (nh NonceHandler) ReturnNonce(ctx echo.Context, chainId uint64, address string, nonceI uint64) error {
+func (nh NonceHandler) ReturnNonce(ctx echo.Context, chainId uint64, address string, nonceI uint64, params nonceServer.ReturnNonceParams) error {
 	nm := ctx.Get("NonceManager").(*nonce.NonceManager)
 
 	err := nm.ReturnNonce(nonceI, nonce.ChainID(chainId), nonce.Address(address))

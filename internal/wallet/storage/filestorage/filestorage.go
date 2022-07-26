@@ -23,7 +23,7 @@ func NewFileStorage(c interface{}) (types.IWalletStorage, error) {
 	_, err := os.Stat(config.Path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			err = os.Mkdir(config.Path, 0700)
+			err = os.MkdirAll(config.Path, 0700)
 			if err != nil {
 				return nil, err
 			}
@@ -66,9 +66,6 @@ func (fs *FileStorage) Load(address string, apiKeyHashed string) (*types.WalletS
 		return nil, err
 	}
 
-	logrus.Println(ws.ApiKeyHashed)
-	logrus.Println(apiKeyHashed)
-
 	if ws.ApiKeyHashed != apiKeyHashed {
 		return nil, fmt.Errorf("Failed to load the wallet")
 	}
@@ -77,6 +74,5 @@ func (fs *FileStorage) Load(address string, apiKeyHashed string) (*types.WalletS
 }
 
 func (fs *FileStorage) getFilename(address string) string {
-
 	return path.Join(fs.config.Path, fmt.Sprintf(".%s.wallet.json", address))
 }

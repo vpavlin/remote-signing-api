@@ -37,10 +37,10 @@ func main() {
 
 	hash := produceHash(opts.Message)
 
-	body := signer.PostSignerAddressBytesJSONBody{}
+	body := signer.SignBytesJSONBody{}
 	body.Bytes = &hash
 
-	params := signer.PostSignerAddressBytesParams{
+	params := signer.SignBytesParams{
 		Authorization: fmt.Sprintf("Bearer %s", opts.Key),
 	}
 
@@ -49,7 +49,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	rtx, err := c.PostSignerAddressBytesWithResponse(context.Background(), opts.Address, &params, body)
+	rtx, err := c.SignBytesWithResponse(context.Background(), opts.Address, &params, body)
 	if rtx.StatusCode() != http.StatusOK {
 		log.Fatal("Status not 200: %s", rtx.Status())
 	}
@@ -62,7 +62,6 @@ func main() {
 	if !ok {
 		log.Fatal("Recovered address does not match")
 	}
-
 }
 
 func produceHash(message string) []byte {

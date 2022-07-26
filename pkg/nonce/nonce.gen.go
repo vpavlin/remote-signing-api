@@ -47,6 +47,13 @@ type GetNonceParams struct {
 	XNONCEAUTHSIGNER    XNonceAuthSigner    `json:"X-NONCE-AUTH-SIGNER"`
 }
 
+// ReturnNonceParams defines parameters for ReturnNonce.
+type ReturnNonceParams struct {
+	XNONCEAUTHHASH      XNonceAuthHash      `json:"X-NONCE-AUTH-HASH"`
+	XNONCEAUTHSIGNATURE XNonceAuthSignature `json:"X-NONCE-AUTH-SIGNATURE"`
+	XNONCEAUTHSIGNER    XNonceAuthSigner    `json:"X-NONCE-AUTH-SIGNER"`
+}
+
 // RequestEditorFn  is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
 
@@ -127,7 +134,7 @@ type ClientInterface interface {
 	SyncNonce(ctx context.Context, chainId uint64, address Address, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ReturnNonce request
-	ReturnNonce(ctx context.Context, chainId uint64, address Address, nonce uint64, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ReturnNonce(ctx context.Context, chainId uint64, address Address, nonce uint64, params *ReturnNonceParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) GetNonce(ctx context.Context, chainId uint64, address Address, params *GetNonceParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -154,8 +161,8 @@ func (c *Client) SyncNonce(ctx context.Context, chainId uint64, address Address,
 	return c.Client.Do(req)
 }
 
-func (c *Client) ReturnNonce(ctx context.Context, chainId uint64, address Address, nonce uint64, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewReturnNonceRequest(c.Server, chainId, address, nonce)
+func (c *Client) ReturnNonce(ctx context.Context, chainId uint64, address Address, nonce uint64, params *ReturnNonceParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReturnNonceRequest(c.Server, chainId, address, nonce, params)
 	if err != nil {
 		return nil, err
 	}
@@ -276,7 +283,7 @@ func NewSyncNonceRequest(server string, chainId uint64, address Address) (*http.
 }
 
 // NewReturnNonceRequest generates requests for ReturnNonce
-func NewReturnNonceRequest(server string, chainId uint64, address Address, nonce uint64) (*http.Request, error) {
+func NewReturnNonceRequest(server string, chainId uint64, address Address, nonce uint64, params *ReturnNonceParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -319,6 +326,33 @@ func NewReturnNonceRequest(server string, chainId uint64, address Address, nonce
 	if err != nil {
 		return nil, err
 	}
+
+	var headerParam0 string
+
+	headerParam0, err = runtime.StyleParamWithLocation("simple", false, "X-NONCE-AUTH-HASH", runtime.ParamLocationHeader, params.XNONCEAUTHHASH)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("X-NONCE-AUTH-HASH", headerParam0)
+
+	var headerParam1 string
+
+	headerParam1, err = runtime.StyleParamWithLocation("simple", false, "X-NONCE-AUTH-SIGNATURE", runtime.ParamLocationHeader, params.XNONCEAUTHSIGNATURE)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("X-NONCE-AUTH-SIGNATURE", headerParam1)
+
+	var headerParam2 string
+
+	headerParam2, err = runtime.StyleParamWithLocation("simple", false, "X-NONCE-AUTH-SIGNER", runtime.ParamLocationHeader, params.XNONCEAUTHSIGNER)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("X-NONCE-AUTH-SIGNER", headerParam2)
 
 	return req, nil
 }
@@ -373,7 +407,7 @@ type ClientWithResponsesInterface interface {
 	SyncNonceWithResponse(ctx context.Context, chainId uint64, address Address, reqEditors ...RequestEditorFn) (*SyncNonceResponse, error)
 
 	// ReturnNonce request
-	ReturnNonceWithResponse(ctx context.Context, chainId uint64, address Address, nonce uint64, reqEditors ...RequestEditorFn) (*ReturnNonceResponse, error)
+	ReturnNonceWithResponse(ctx context.Context, chainId uint64, address Address, nonce uint64, params *ReturnNonceParams, reqEditors ...RequestEditorFn) (*ReturnNonceResponse, error)
 }
 
 type GetNonceResponse struct {
@@ -459,8 +493,8 @@ func (c *ClientWithResponses) SyncNonceWithResponse(ctx context.Context, chainId
 }
 
 // ReturnNonceWithResponse request returning *ReturnNonceResponse
-func (c *ClientWithResponses) ReturnNonceWithResponse(ctx context.Context, chainId uint64, address Address, nonce uint64, reqEditors ...RequestEditorFn) (*ReturnNonceResponse, error) {
-	rsp, err := c.ReturnNonce(ctx, chainId, address, nonce, reqEditors...)
+func (c *ClientWithResponses) ReturnNonceWithResponse(ctx context.Context, chainId uint64, address Address, nonce uint64, params *ReturnNonceParams, reqEditors ...RequestEditorFn) (*ReturnNonceResponse, error) {
+	rsp, err := c.ReturnNonce(ctx, chainId, address, nonce, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -535,7 +569,7 @@ type ServerInterface interface {
 	SyncNonce(ctx echo.Context, chainId uint64, address Address) error
 	// Returns unused nonce
 	// (PUT /nonce/{chainId}/{address}/{nonce})
-	ReturnNonce(ctx echo.Context, chainId uint64, address Address, nonce uint64) error
+	ReturnNonce(ctx echo.Context, chainId uint64, address Address, nonce uint64, params ReturnNonceParams) error
 }
 
 // ServerInterfaceWrapper converts echo contexts to parameters.
@@ -674,8 +708,64 @@ func (w *ServerInterfaceWrapper) ReturnNonce(ctx echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter nonce: %s", err))
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ReturnNonceParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "X-NONCE-AUTH-HASH" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-NONCE-AUTH-HASH")]; found {
+		var XNONCEAUTHHASH XNonceAuthHash
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for X-NONCE-AUTH-HASH, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithLocation("simple", false, "X-NONCE-AUTH-HASH", runtime.ParamLocationHeader, valueList[0], &XNONCEAUTHHASH)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter X-NONCE-AUTH-HASH: %s", err))
+		}
+
+		params.XNONCEAUTHHASH = XNONCEAUTHHASH
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter X-NONCE-AUTH-HASH is required, but not found"))
+	}
+	// ------------- Required header parameter "X-NONCE-AUTH-SIGNATURE" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-NONCE-AUTH-SIGNATURE")]; found {
+		var XNONCEAUTHSIGNATURE XNonceAuthSignature
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for X-NONCE-AUTH-SIGNATURE, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithLocation("simple", false, "X-NONCE-AUTH-SIGNATURE", runtime.ParamLocationHeader, valueList[0], &XNONCEAUTHSIGNATURE)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter X-NONCE-AUTH-SIGNATURE: %s", err))
+		}
+
+		params.XNONCEAUTHSIGNATURE = XNONCEAUTHSIGNATURE
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter X-NONCE-AUTH-SIGNATURE is required, but not found"))
+	}
+	// ------------- Required header parameter "X-NONCE-AUTH-SIGNER" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-NONCE-AUTH-SIGNER")]; found {
+		var XNONCEAUTHSIGNER XNonceAuthSigner
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for X-NONCE-AUTH-SIGNER, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithLocation("simple", false, "X-NONCE-AUTH-SIGNER", runtime.ParamLocationHeader, valueList[0], &XNONCEAUTHSIGNER)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter X-NONCE-AUTH-SIGNER: %s", err))
+		}
+
+		params.XNONCEAUTHSIGNER = XNONCEAUTHSIGNER
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter X-NONCE-AUTH-SIGNER is required, but not found"))
+	}
+
 	// Invoke the callback with all the unmarshalled arguments
-	err = w.Handler.ReturnNonce(ctx, chainId, address, nonce)
+	err = w.Handler.ReturnNonce(ctx, chainId, address, nonce, params)
 	return err
 }
 
@@ -716,20 +806,20 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/9xUUY7bNhC9CjHNp2xpvc4uoq86iZMNijqFnbQBgi0wpsYWE4lUSUprV9BheoCeIhcr",
-	"SMlRvLVTLfJRIH82Rc57896bqYGrvFCSpDUQ11Cgxpwsaf/v3UJJTrPSpjdoUnciJMSQEiakIQCJOUEM",
-	"70aL14tn89Hs7Zub0c1sdQMBaPqjFJoSiK0uKQDDU8rRlbD7wj0yVgu5haYJvoBZia1EW2oahrV69XIx",
-	"e/N2Of8mQNLD0ebLr0I90rSBGH4Ie1XD9qsJZ0miyRhoHIPu0L05nMc10A7zInPA0e7pZHr5ePL48tn1",
-	"xQs+m1yv59OLSXQ1fzq5fnI5n07p4vnman31HAIo0FrSjv/v0e49jjaz0Yto9OS2nkbNIwjuCxCAb39J",
-	"plDSeKkLrQrSVpCngT2jQQ0FwFMU8lXiXmyUztFCDKWQ9mrawwtpaUvaXZcOf9jl5vORWn8gblv5hNwo",
-	"954raZFbr12OIoMYKuQZVuMCq0zIH7fudMxV3nv666e/3A32C1bZp7+l45OQ4VoUVign4tympKnM2W+Y",
-	"ZWSZV4v9jBK3pBlmmbozbKM0sxr5RyG3zPdjmFUMKyUSxlWWCSOUNK4jYb2lR2UggIq0aQGjcTS+cDxU",
-	"QRILATFcjqPxpLU29UaEHiOsO6WbsO5carx/yngRjhtZktWCKscsJSZpZxlWKDJcZ9RyZigTVhYJ2u7S",
-	"55acws4bV8kT0/638xhekvXNeH79vnjfDZHj3Mt9CNO3j01wsv4hel+rPyRmp1n0/YX3luGDXvR77cHP",
-	"HLtb11w7rT4Mkyg6pJ+kNx6LIhPcWxR+MM79eqC+x7vAT9dxil7/5KfQlHmOej8oVk5g3LpIdKN+6yqc",
-	"j3Bo9pKfz/FqL3mqlRR/kulyK8t8TZrdCZuydab4R1/Ux1lVpO+08IkekmZX/buL85nE/IezXwjd6XxP",
-	"4AcbW/tP7Y4qT6+oUkvDSlkaSjpQq87uIr93N6V2K5qVhv7lZlvwe1xPJ4ofhu1/iMop406lo2n+CQAA",
-	"///mqUOkYwoAAA==",
+	"H4sIAAAAAAAC/+RUUY7bNhC9CjHNp2xpvc4uoq86iZMNim4KO2kDBFtgTI0tJhKpkpTWrqDD9AA9RS5W",
+	"kJKjeGMnWuRv+2dT5Myb9968GrjKCyVJWgNxDQVqzMmS9v/eXSvJaVba9ApN6k6EhBhSwoQ0BCAxJ4jh",
+	"3ej69fWz+Wj29s3V6Gq2vIIANP1VCk0JxFaXFIDhKeXoSthd4R4Zq4XcQNMEX7RZio1EW2oa1mv56uX1",
+	"7M3bxfyHGpIe3m2++GarR5rWEMNPYc9q2H414SxJNBkDjUPQHbo3+/O4BtpiXmSucbR9OpmeP548Pn92",
+	"efaCzyaXq/n0bBJdzJ9OLp+cz6dTOnu+vlhdPIcACrSWtMP/Z7R9j6P1bPQiGj25qadR8wiCuwQE4Mdf",
+	"kCmUNJ7qQquCtBXkYWCPaNBAAfAUhXyVuBdrpXO0EEMppL2Y9u2FtLQh7a5L13/Y5ebzkVp9IG5b+oRc",
+	"K/eeK2mRW89djiKDGCrkGVbjAqtMyJ837nTMVd5r+vunf9wN9htW2ad/pcOTkOFaFFYoR+LcpqSpzNkf",
+	"mGVkmWeL/YoSN6QZZpm6NWytNLMa+UchN8zPY5hVDCslEsZVlgkjlDRuImG9pAdlIICKtGkbRuNofOZw",
+	"qIIkFgJiOB9H40krbeqFCH2PsO6YbsK6U6nx+injSTgcZEFWC6ocspSYpK1lWKHIcJVRi5mhTFhZJGi7",
+	"S59Hcgw7bVwlD0z7305jeEnWD+Px9Xnxvlsih7mne2+mH1+b4Gj9vfW+VX+IzY6j6OcL74ThvV70uXbv",
+	"Zw7djRuu3VZvhkkU7d1P0guPRZEJ7iUKPxinfj2Q38Ms8Nt16KLXv/gtNGWeo94NspUjGDfOEt2q37gK",
+	"py0cmp3kp3283EmeaiXF32Q638oyX5Fmt8KmbJUp/tEX9XZWFelbLbyjh7jZVX9wdj7hmO8o+wXRHc93",
+	"CL63sLX/1GZUeTyiSi0NK2VpKOmaWnUyi3zurkvtIpqVhr5Ssy34EOPpSPH9sv3vku/7CfWVq45Zt2n+",
+	"CwAA//+JYBgRAAsAAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

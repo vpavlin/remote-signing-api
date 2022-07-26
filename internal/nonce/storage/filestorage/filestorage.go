@@ -23,7 +23,7 @@ func NewFileStorage(c interface{}) (types.INonceStorage, error) {
 	_, err := os.Stat(config.Path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			err = os.Mkdir(config.Path, 0700)
+			err = os.MkdirAll(config.Path, 0700)
 			if err != nil {
 				return nil, err
 			}
@@ -70,6 +70,5 @@ func (fs *FileStorage) Load(chainId uint64, address string) (*types.NonceSeriali
 }
 
 func (fs *FileStorage) getFilename(chainId uint64, address string) string {
-
 	return path.Join(fs.config.Path, fmt.Sprintf(".%s-%d.nonce.json", address, chainId))
 }
