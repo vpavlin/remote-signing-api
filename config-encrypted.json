@@ -1,0 +1,31 @@
+{
+    "server": {
+        "hostname": "localhost",
+        "port": 4444,
+        "logLevel": "debug"
+    },
+    "rpcUrls": [
+        {
+            "chainId": 80001,
+            "url": "https://matic-testnet-archive-rpc.bwarelabs.com"
+        }
+    ],
+    "nonceManager": {
+        "authBySig": true,
+        "autoSync": true,
+        "syncInterval": 1,
+        "syncAfter": 10,
+        "storageType": "filestorage",
+        "storageConfig": {
+            "path": "./tmp/nonces/"
+        }
+    },
+    "walletManager": {
+        "storageType": "encryptedfilestorage",
+        "storageConfig": {
+            "path": "./tmp/walletmanager/",
+            "passwordEnvName": "WM_PASSWORD"
+        }
+
+    }
+}
