@@ -18,7 +18,7 @@ type SignerHandlers struct{}
 func SetupSigner(e *echo.Echo, config *config.Config) {
 	g := e.Group("")
 
-	wm, err := wallet.NewWalletManager(nil, config.WalletManager)
+	wm, err := wallet.NewWalletManager(config.WalletManager)
 	if err != nil {
 		logrus.Fatal(err)
 	}
@@ -63,6 +63,7 @@ func (sh SignerHandlers) NewSigner(ctx echo.Context) error {
 
 	wm := ctx.Get("WalletManager").(*wallet.WalletManager)
 
+	logrus.Warn(ns)
 	w, err := wm.New(*ns.Key)
 	if err != nil {
 		ctx.Logger().Error(err)

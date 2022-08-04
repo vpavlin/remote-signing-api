@@ -2,21 +2,19 @@ package main
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"math/big"
 	"net/http"
-	"reflect"
 	"strconv"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/vpavlin/remote-signing-api/bindings"
+	"github.com/vpavlin/remote-signing-api/pkg/abierrors"
 	"github.com/vpavlin/remote-signing-api/pkg/nonce"
 	"github.com/vpavlin/remote-signing-api/pkg/signer"
 
@@ -114,6 +112,11 @@ func signTX() {
 		log.Fatal(err)
 	}
 
+	errors, err := abierrors.ExtractErrors(bindings.CollectionManagerMetaData.ABI)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	sc, err := signer.NewTransactionClient(URL)
 	if err != nil {
 		log.Fatal(err)
@@ -151,7 +154,7 @@ func signTX() {
 	if cerr != nil {
 		returnNonceFN()
 
-		t := reflect.TypeOf(cerr)
+		/*t := reflect.TypeOf(cerr)
 		var data []byte
 
 		for i := 0; i < t.Elem().NumField(); i++ {
@@ -177,11 +180,13 @@ func signTX() {
 		unpacked, err := tryErr.Unpack(data)
 		if err != nil {
 			log.Fatal(err)
+		}*/
+
+		unpacked, err := errors.UnpackError(cerr)
+		if err != nil {
+			log.Fatal(err)
 		}
-
-		log.Println("Unpacked UnexpectedCaller arguments: ", unpacked)
-
-		log.Fatal("Call contract: ", cerr)
+		log.Fatal("Unpacked UnexpectedCaller arguments: ", unpacked)
 	}
 
 	signer := types.LatestSignerForChainID(tx.ChainId())
