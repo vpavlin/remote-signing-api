@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -59,6 +60,10 @@ func (sh SignerHandlers) NewSigner(ctx echo.Context) error {
 	err := ctx.Bind(ns)
 	if err != nil {
 		return err
+	}
+
+	if ns.Key == nil {
+		return fmt.Errorf("Missing key")
 	}
 
 	wm := ctx.Get("WalletManager").(*wallet.WalletManager)
