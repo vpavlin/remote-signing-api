@@ -9,6 +9,8 @@ type Server struct {
 	Hostname string `json:"hostname"`
 	Port     int    `json:"port"`
 	LogLevel string `json:"logLevel"`
+	CertPath string `json:"certPath"`
+	KeyPath  string `json:"keyPath"`
 }
 
 type Rpc struct {

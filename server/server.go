@@ -39,5 +39,9 @@ func main() {
 		return ctx.JSON(http.StatusOK, e.Routes())
 	})
 
-	e.Start(fmt.Sprintf("%s:%d", config.Server.Hostname, config.Server.Port))
+	if len(config.Server.CertPath) > 0 && len(config.Server.KeyPath) > 0 {
+		logrus.Fatal(e.StartTLS(fmt.Sprintf("%s:%d", config.Server.Hostname, config.Server.Port), config.Server.CertPath, config.Server.KeyPath))
+	}
+
+	logrus.Fatal(e.Start(fmt.Sprintf("%s:%d", config.Server.Hostname, config.Server.Port)))
 }
