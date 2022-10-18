@@ -1,6 +1,8 @@
 VERSION=v0.1
 PUSH_TARGET=quay.io/rubixlife/remote-signing-api:$(VERSION)
-
+QUAY_USER=vpavlin0
+QUAY_PASSWORD=
+LABEL=
 
 
 generate:
@@ -15,11 +17,16 @@ build: fmt
 	go build -o remote-signing-api server/server.go 
 
 container:
-	podman build -t rubixlife/remote-signing-api .
+	podman build -t rubixlife/remote-signing-api $(LABEL) .
 
 push:
 	podman tag rubixlife/remote-signing-api $(PUSH_TARGET)
 	podman push $(PUSH_TARGET)
+
+login:
+	podman login -u $(QUAY_USER) -p $(QUAY_PASSWORD) quay.io
+
+release-pr: login build container push
 
 run-container:
 	podman run -it --rm --security-opt seccomp=unconfined \
