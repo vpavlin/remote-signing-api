@@ -70,6 +70,11 @@ func SetupNonce(e *echo.Echo, config *config.Config) {
 
 			},
 		}))
+	} else {
+		g.Use(middleware.KeyAuth(
+			func(auth string, c echo.Context) (bool, error) {
+				return config.NonceManager.ApiKey == auth, nil
+			}))
 	}
 
 	nh := new(NonceHandler)
@@ -77,10 +82,10 @@ func SetupNonce(e *echo.Echo, config *config.Config) {
 	nonceServer.RegisterHandlers(g, nh)
 }
 
-func (nh NonceHandler) GetNonce(ctx echo.Context, chainId uint64, address string, params nonceServer.GetNonceParams) error {
+func (nh NonceHandler) GetNonceWithSigner(ctx echo.Context, chainId uint64, address string, params nonceServer.GetNonceWithSignerParams) error {
 	nm := ctx.Get("NonceManager").(*nonce.NonceManager)
 
-	resp := new(nonceServer.NonceResponse)
+	resp := &nonceServer.NonceResponse{}
 
 	nonce, err := nm.GetNonce(nonce.ChainID(chainId), nonce.Address(address))
 	if err != nil {
@@ -95,7 +100,36 @@ func (nh NonceHandler) GetNonce(ctx echo.Context, chainId uint64, address string
 	return ctx.JSON(http.StatusOK, resp)
 }
 
-func (nh NonceHandler) ReturnNonce(ctx echo.Context, chainId uint64, address string, nonceI uint64, params nonceServer.ReturnNonceParams) error {
+func (nh NonceHandler) ReturnNonceWithSigner(ctx echo.Context, chainId uint64, address string, nonceI uint64, params nonceServer.ReturnNonceWithSignerParams) error {
+	nm := ctx.Get("NonceManager").(*nonce.NonceManager)
+
+	err := nm.ReturnNonce(nonceI, nonce.ChainID(chainId), nonce.Address(address))
+	if err != nil {
+		return ctx.JSON(http.StatusInternalServerError, &ErrorResponse{Error: err.Error()})
+	}
+
+	return ctx.NoContent(http.StatusOK)
+}
+
+func (nh NonceHandler) GetNonce(ctx echo.Context, chainId uint64, address string) error {
+	nm := ctx.Get("NonceManager").(*nonce.NonceManager)
+
+	resp := &nonceServer.NonceResponse{}
+
+	nonce, err := nm.GetNonce(nonce.ChainID(chainId), nonce.Address(address))
+	if err != nil {
+		ctx.Error(err)
+		return ctx.JSON(http.StatusInternalServerError, &ErrorResponse{Error: err.Error()})
+	}
+
+	resp.Nonce = &nonce
+	resp.Address = &address
+	resp.ChainId = &chainId
+
+	return ctx.JSON(http.StatusOK, resp)
+}
+
+func (nh NonceHandler) ReturnNonce(ctx echo.Context, chainId uint64, address string, nonceI uint64) error {
 	nm := ctx.Get("NonceManager").(*nonce.NonceManager)
 
 	err := nm.ReturnNonce(nonceI, nonce.ChainID(chainId), nonce.Address(address))

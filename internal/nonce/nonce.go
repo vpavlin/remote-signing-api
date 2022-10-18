@@ -187,6 +187,7 @@ func (n *Nonce) DecreaseNonce() error {
 }
 
 func (n *Nonce) autoSync(client *ethclient.Client, syncInterval time.Duration, syncAfter time.Duration) error {
+	logrus.Info("Starting AutoSync")
 	for {
 		select {
 		case <-time.After(syncInterval):
@@ -199,7 +200,7 @@ func (n *Nonce) autoSync(client *ethclient.Client, syncInterval time.Duration, s
 				err := n.Sync(client)
 				if err != nil {
 					logrus.Errorf("AutoSync: %s\n", err)
-					return err
+					//return err //TODO: should not return
 				}
 			}
 		}

@@ -7,6 +7,16 @@ info:
     name: Václav Pavlín
     email: vaclav.pavlin@gmail.com
 paths:
+  /signer/health:
+    get:
+      summary: Health check endpoint
+      description: A method to check if the API is reacheable and healthy
+      tags:
+      - signer
+      operationId: health
+      responses:
+        200:
+          description: OK
   /signer/new:
     post:
       summary: Creates new signer

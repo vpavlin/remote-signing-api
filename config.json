@@ -13,7 +13,8 @@
         }
     ],
     "nonceManager": {
-        "authBySig": true,
+        "authBySig": false,
+        "apiKey": "70m7aDS3zB1qnIQnTDPt",
         "autoSync": true,
         "syncInterval": 1,
         "syncAfter": 10,

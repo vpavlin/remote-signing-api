@@ -33,7 +33,8 @@ func SetupSigner(e *echo.Echo, config *config.Config) {
 
 	g.Use(middleware.KeyAuthWithConfig(middleware.KeyAuthConfig{
 		Skipper: func(ctx echo.Context) bool {
-			if ctx.Request().URL.String() == "/signer/new" {
+			url := ctx.Request().URL.String()
+			if url == "/signer/health" || url == "/signer/new" {
 				return true
 			}
 			return false
@@ -140,6 +141,15 @@ func (sn SignerHandlers) ReplaceKey(ctx echo.Context, address signer.Address, pa
 	}
 
 	return ctx.JSON(http.StatusOK, nil)
+}
+
+func (sn SignerHandlers) Health(ctx echo.Context) error {
+	wm := ctx.Get("WalletManager").(*wallet.WalletManager)
+
+	if wm == nil {
+		return fmt.Errorf("Failed to initialize Wallet Manager")
+	}
+	return ctx.NoContent(http.StatusOK)
 }
 
 /*func HandleTxSign(ctx echo.Context) error {

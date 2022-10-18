@@ -25,6 +25,7 @@ type NonceManagerConfig struct {
 	StorageType   string      `json:"storageType"`
 	StorageConfig interface{} `json:"storageConfig"`
 	AuthBySig     bool        `json:"authBySig"`
+	ApiKey        string      `json:"apiKey"`
 }
 
 type WalletManagerConfig struct {

@@ -7,13 +7,13 @@ info:
     name: Václav Pavlín
     email: vaclav.pavlin@gmail.com
 paths:
-  /nonce/{chainId}/{address}:
+  /nonce/{chainId}/{address}/signed:
     post:
       summary: Retrieves the next available nonce
       description: Retrieves the next available nonce and updates the tracking information
       tags:
       - nonce
-      operationId: getNonce
+      operationId: getNonceWithSigner
       parameters:
         - name: address
           in: path
@@ -36,13 +36,41 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/NonceResponse"
-  /nonce/{chainId}/{address}/{nonce}:
+  /nonce/{chainId}/{address}:
+    post:
+      summary: Retrieves the next available nonce
+      description: Retrieves the next available nonce and updates the tracking information
+      security:
+        - bearerAuth: []
+      tags:
+      - nonce
+      operationId: getNonce
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Address"
+        - name: chainId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: uint64
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NonceResponse"
+  /nonce/{chainId}/{address}/{nonce}/signed:
     put:
       summary: Returns unused nonce
       description: Returns unused nonce to the tracking information for further use
       tags:
       - nonce
-      operationId: returnNonce
+      operationId: returnNonceWithSigner
       parameters:
         - name: address
           in: path
@@ -64,6 +92,36 @@ paths:
         - $ref: "#/components/parameters/XNonceAuthHash"
         - $ref: "#/components/parameters/XNonceAuthSignature"
         - $ref: "#/components/parameters/XNonceAuthSigner"
+      responses:
+        200:
+          description: OK
+  /nonce/{chainId}/{address}/{nonce}:
+    put:
+      summary: Returns unused nonce
+      description: Returns unused nonce to the tracking information for further use
+      security:
+        - bearerAuth: []
+      tags:
+      - nonce
+      operationId: returnNonce
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Address"
+        - name: chainId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: uint64
+        - name: nonce
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: uint64
       responses:
         200:
           description: OK
@@ -128,4 +186,11 @@ components:
       required: true
       schema:
         type: string
+  securitySchemes:
+    bearerAuth:
+      scheme: bearer
+      type: http
 
+
+security:
+  - bearerAuth: []
