@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/sirupsen/logrus"
 	"github.com/vpavlin/remote-signing-api/config"
@@ -14,10 +13,9 @@ import (
 )
 
 type ChainID uint64
-type Address string
 
 type AddressedNonces struct {
-	Nonces map[Address]*Nonce
+	Nonces map[string]*Nonce
 }
 
 type NonceManager struct {
@@ -54,8 +52,8 @@ func (nm *NonceManager) initClients(rpcUrls []config.Rpc) error {
 	return nil
 }
 
-func (nm *NonceManager) GetNonce(chainId ChainID, address Address) (uint64, error) {
-	nonce, err := nm.getNonceObject(chainId, address)
+func (nm *NonceManager) GetNonce(chainId ChainID, address string, contract *string) (uint64, error) {
+	nonce, err := nm.getNonceObject(chainId, address, contract)
 	if err != nil {
 		return 0, err
 	}
@@ -63,8 +61,8 @@ func (nm *NonceManager) GetNonce(chainId ChainID, address Address) (uint64, erro
 	return nonce.GetNonce()
 }
 
-func (nm *NonceManager) ReturnNonce(returnedNonce uint64, chainId ChainID, address Address) error {
-	nonce, err := nm.getNonceObject(chainId, address)
+func (nm *NonceManager) ReturnNonce(returnedNonce uint64, chainId ChainID, address string, contract *string) error {
+	nonce, err := nm.getNonceObject(chainId, address, contract)
 	if err != nil {
 		return err
 	}
@@ -72,8 +70,8 @@ func (nm *NonceManager) ReturnNonce(returnedNonce uint64, chainId ChainID, addre
 	return nonce.ReturnNonce(returnedNonce)
 }
 
-func (nm *NonceManager) DecreaseNonce(chainId ChainID, address Address) error {
-	nonce, err := nm.getNonceObject(chainId, address)
+func (nm *NonceManager) DecreaseNonce(chainId ChainID, address string, contract *string) error {
+	nonce, err := nm.getNonceObject(chainId, address, contract)
 	if err != nil {
 		return err
 	}
@@ -81,8 +79,8 @@ func (nm *NonceManager) DecreaseNonce(chainId ChainID, address Address) error {
 	return nonce.DecreaseNonce()
 }
 
-func (nm *NonceManager) Sync(chainId ChainID, address Address) error {
-	nonce, err := nm.getNonceObject(chainId, address)
+func (nm *NonceManager) Sync(chainId ChainID, address string, contract *string) error {
+	nonce, err := nm.getNonceObject(chainId, address, contract)
 	if err != nil {
 		return err
 	}
@@ -95,7 +93,7 @@ func (nm *NonceManager) Sync(chainId ChainID, address Address) error {
 	return nonce.Sync(client)
 }
 
-func (nm *NonceManager) getNonceObject(chainId ChainID, address Address) (*Nonce, error) {
+func (nm *NonceManager) getNonceObject(chainId ChainID, address string, contract *string) (*Nonce, error) {
 	an, ok := nm.ChainNonces[chainId]
 	if !ok {
 		logrus.WithFields(logrus.Fields{
@@ -103,7 +101,7 @@ func (nm *NonceManager) getNonceObject(chainId ChainID, address Address) (*Nonce
 			"chainId": chainId,
 		}).Info("Initializing new chainID")
 		an = new(AddressedNonces)
-		an.Nonces = make(map[Address]*Nonce)
+		an.Nonces = make(map[string]*Nonce)
 		nm.ChainNonces[chainId] = an
 	}
 
@@ -124,7 +122,7 @@ func (nm *NonceManager) getNonceObject(chainId ChainID, address Address) (*Nonce
 		syncInterval := time.Duration(nm.config.SyncInterval) * time.Second
 		syncAfter := time.Duration(nm.config.SyncAfter) * time.Second
 
-		nonce, err = NewNonceWithConfig(client, nm.storage, common.HexToAddress(string(address)), uint64(chainId), nm.config.AutoSync, syncInterval, syncAfter)
+		nonce, err = NewNonceWithConfig(client, nm.storage, address, uint64(chainId), contract, nm.config.AutoSync, syncInterval, syncAfter)
 		if err != nil {
 			return nil, err
 		}

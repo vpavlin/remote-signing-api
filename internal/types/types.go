@@ -2,11 +2,12 @@ package types
 
 type INonceStorage interface {
 	Store(n *NonceSerializable) error
-	Load(chainId uint64, address string) (*NonceSerializable, error)
+	Load(chainId uint64, address string, contract *string) (*NonceSerializable, error)
 }
 
 type NonceSerializable struct {
 	Address        string         `json:"address"`
+	Contract       *string        `json:"contract,omitempty"`
 	ChainId        uint64         `json:"chainId"`
 	Nonce          uint64         `json:"nonce"`
 	ReturnedNonces SortedNonceArr `json:"returnedNonces"`

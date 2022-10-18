@@ -45,14 +45,14 @@ func (fs *FileStorage) Store(n *types.NonceSerializable) error {
 		return err
 	}
 
-	filename := fs.getFilename(n.ChainId, n.Address)
+	filename := fs.getFilename(n.ChainId, n.Address, n.Contract)
 	logrus.Debugf("Storing nonce info into %s", filename)
 
 	return ioutil.WriteFile(filename, data, 0600)
 }
 
-func (fs *FileStorage) Load(chainId uint64, address string) (*types.NonceSerializable, error) {
-	filename := fs.getFilename(chainId, address)
+func (fs *FileStorage) Load(chainId uint64, address string, contract *string) (*types.NonceSerializable, error) {
+	filename := fs.getFilename(chainId, address, contract)
 	logrus.Debugf("Loading nonce info from %s", filename)
 
 	data, err := ioutil.ReadFile(filename)
@@ -69,6 +69,10 @@ func (fs *FileStorage) Load(chainId uint64, address string) (*types.NonceSeriali
 	return ns, nil
 }
 
-func (fs *FileStorage) getFilename(chainId uint64, address string) string {
+func (fs *FileStorage) getFilename(chainId uint64, address string, contract *string) string {
+	if contract != nil {
+		return path.Join(fs.config.Path, fmt.Sprintf(".%s-%s-%d.nonce.json", address, *contract, chainId))
+	}
+
 	return path.Join(fs.config.Path, fmt.Sprintf(".%s-%d.nonce.json", address, chainId))
 }
