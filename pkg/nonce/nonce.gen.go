@@ -21,6 +21,10 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+const (
+	BearerAuthScopes = "bearerAuth.Scopes"
+)
+
 // Address defines model for Address.
 type Address = string
 
@@ -40,15 +44,15 @@ type XNonceAuthSignature = string
 // XNonceAuthSigner defines model for XNonceAuthSigner.
 type XNonceAuthSigner = Address
 
-// GetNonceParams defines parameters for GetNonce.
-type GetNonceParams struct {
+// GetNonceWithSignerParams defines parameters for GetNonceWithSigner.
+type GetNonceWithSignerParams struct {
 	XNONCEAUTHHASH      XNonceAuthHash      `json:"X-NONCE-AUTH-HASH"`
 	XNONCEAUTHSIGNATURE XNonceAuthSignature `json:"X-NONCE-AUTH-SIGNATURE"`
 	XNONCEAUTHSIGNER    XNonceAuthSigner    `json:"X-NONCE-AUTH-SIGNER"`
 }
 
-// ReturnNonceParams defines parameters for ReturnNonce.
-type ReturnNonceParams struct {
+// ReturnNonceWithSignerParams defines parameters for ReturnNonceWithSigner.
+type ReturnNonceWithSignerParams struct {
 	XNONCEAUTHHASH      XNonceAuthHash      `json:"X-NONCE-AUTH-HASH"`
 	XNONCEAUTHSIGNATURE XNonceAuthSignature `json:"X-NONCE-AUTH-SIGNATURE"`
 	XNONCEAUTHSIGNER    XNonceAuthSigner    `json:"X-NONCE-AUTH-SIGNER"`
@@ -128,17 +132,35 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 // The interface specification for the client above.
 type ClientInterface interface {
 	// GetNonce request
-	GetNonce(ctx context.Context, chainId uint64, address Address, params *GetNonceParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+	GetNonce(ctx context.Context, chainId uint64, address Address, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetNonceWithSigner request
+	GetNonceWithSigner(ctx context.Context, chainId uint64, address Address, params *GetNonceWithSignerParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SyncNonce request
 	SyncNonce(ctx context.Context, chainId uint64, address Address, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ReturnNonce request
-	ReturnNonce(ctx context.Context, chainId uint64, address Address, nonce uint64, params *ReturnNonceParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ReturnNonce(ctx context.Context, chainId uint64, address Address, nonce uint64, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReturnNonceWithSigner request
+	ReturnNonceWithSigner(ctx context.Context, chainId uint64, address Address, nonce uint64, params *ReturnNonceWithSignerParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
-func (c *Client) GetNonce(ctx context.Context, chainId uint64, address Address, params *GetNonceParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetNonceRequest(c.Server, chainId, address, params)
+func (c *Client) GetNonce(ctx context.Context, chainId uint64, address Address, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetNonceRequest(c.Server, chainId, address)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetNonceWithSigner(ctx context.Context, chainId uint64, address Address, params *GetNonceWithSignerParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetNonceWithSignerRequest(c.Server, chainId, address, params)
 	if err != nil {
 		return nil, err
 	}
@@ -161,8 +183,20 @@ func (c *Client) SyncNonce(ctx context.Context, chainId uint64, address Address,
 	return c.Client.Do(req)
 }
 
-func (c *Client) ReturnNonce(ctx context.Context, chainId uint64, address Address, nonce uint64, params *ReturnNonceParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewReturnNonceRequest(c.Server, chainId, address, nonce, params)
+func (c *Client) ReturnNonce(ctx context.Context, chainId uint64, address Address, nonce uint64, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReturnNonceRequest(c.Server, chainId, address, nonce)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ReturnNonceWithSigner(ctx context.Context, chainId uint64, address Address, nonce uint64, params *ReturnNonceWithSignerParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReturnNonceWithSignerRequest(c.Server, chainId, address, nonce, params)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +208,7 @@ func (c *Client) ReturnNonce(ctx context.Context, chainId uint64, address Addres
 }
 
 // NewGetNonceRequest generates requests for GetNonce
-func NewGetNonceRequest(server string, chainId uint64, address Address, params *GetNonceParams) (*http.Request, error) {
+func NewGetNonceRequest(server string, chainId uint64, address Address) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -197,6 +231,47 @@ func NewGetNonceRequest(server string, chainId uint64, address Address, params *
 	}
 
 	operationPath := fmt.Sprintf("/nonce/%s/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetNonceWithSignerRequest generates requests for GetNonceWithSigner
+func NewGetNonceWithSignerRequest(server string, chainId uint64, address Address, params *GetNonceWithSignerParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "chainId", runtime.ParamLocationPath, chainId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "address", runtime.ParamLocationPath, address)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/nonce/%s/%s/signed", pathParam0, pathParam1)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -283,7 +358,7 @@ func NewSyncNonceRequest(server string, chainId uint64, address Address) (*http.
 }
 
 // NewReturnNonceRequest generates requests for ReturnNonce
-func NewReturnNonceRequest(server string, chainId uint64, address Address, nonce uint64, params *ReturnNonceParams) (*http.Request, error) {
+func NewReturnNonceRequest(server string, chainId uint64, address Address, nonce uint64) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -313,6 +388,54 @@ func NewReturnNonceRequest(server string, chainId uint64, address Address, nonce
 	}
 
 	operationPath := fmt.Sprintf("/nonce/%s/%s/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewReturnNonceWithSignerRequest generates requests for ReturnNonceWithSigner
+func NewReturnNonceWithSignerRequest(server string, chainId uint64, address Address, nonce uint64, params *ReturnNonceWithSignerParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "chainId", runtime.ParamLocationPath, chainId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "address", runtime.ParamLocationPath, address)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "nonce", runtime.ParamLocationPath, nonce)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/nonce/%s/%s/%s/signed", pathParam0, pathParam1, pathParam2)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -401,13 +524,19 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 	// GetNonce request
-	GetNonceWithResponse(ctx context.Context, chainId uint64, address Address, params *GetNonceParams, reqEditors ...RequestEditorFn) (*GetNonceResponse, error)
+	GetNonceWithResponse(ctx context.Context, chainId uint64, address Address, reqEditors ...RequestEditorFn) (*GetNonceResponse, error)
+
+	// GetNonceWithSigner request
+	GetNonceWithSignerWithResponse(ctx context.Context, chainId uint64, address Address, params *GetNonceWithSignerParams, reqEditors ...RequestEditorFn) (*GetNonceWithSignerResponse, error)
 
 	// SyncNonce request
 	SyncNonceWithResponse(ctx context.Context, chainId uint64, address Address, reqEditors ...RequestEditorFn) (*SyncNonceResponse, error)
 
 	// ReturnNonce request
-	ReturnNonceWithResponse(ctx context.Context, chainId uint64, address Address, nonce uint64, params *ReturnNonceParams, reqEditors ...RequestEditorFn) (*ReturnNonceResponse, error)
+	ReturnNonceWithResponse(ctx context.Context, chainId uint64, address Address, nonce uint64, reqEditors ...RequestEditorFn) (*ReturnNonceResponse, error)
+
+	// ReturnNonceWithSigner request
+	ReturnNonceWithSignerWithResponse(ctx context.Context, chainId uint64, address Address, nonce uint64, params *ReturnNonceWithSignerParams, reqEditors ...RequestEditorFn) (*ReturnNonceWithSignerResponse, error)
 }
 
 type GetNonceResponse struct {
@@ -426,6 +555,28 @@ func (r GetNonceResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetNonceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetNonceWithSignerResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *NonceResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r GetNonceWithSignerResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetNonceWithSignerResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -474,13 +625,43 @@ func (r ReturnNonceResponse) StatusCode() int {
 	return 0
 }
 
+type ReturnNonceWithSignerResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r ReturnNonceWithSignerResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ReturnNonceWithSignerResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 // GetNonceWithResponse request returning *GetNonceResponse
-func (c *ClientWithResponses) GetNonceWithResponse(ctx context.Context, chainId uint64, address Address, params *GetNonceParams, reqEditors ...RequestEditorFn) (*GetNonceResponse, error) {
-	rsp, err := c.GetNonce(ctx, chainId, address, params, reqEditors...)
+func (c *ClientWithResponses) GetNonceWithResponse(ctx context.Context, chainId uint64, address Address, reqEditors ...RequestEditorFn) (*GetNonceResponse, error) {
+	rsp, err := c.GetNonce(ctx, chainId, address, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
 	return ParseGetNonceResponse(rsp)
+}
+
+// GetNonceWithSignerWithResponse request returning *GetNonceWithSignerResponse
+func (c *ClientWithResponses) GetNonceWithSignerWithResponse(ctx context.Context, chainId uint64, address Address, params *GetNonceWithSignerParams, reqEditors ...RequestEditorFn) (*GetNonceWithSignerResponse, error) {
+	rsp, err := c.GetNonceWithSigner(ctx, chainId, address, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetNonceWithSignerResponse(rsp)
 }
 
 // SyncNonceWithResponse request returning *SyncNonceResponse
@@ -493,12 +674,21 @@ func (c *ClientWithResponses) SyncNonceWithResponse(ctx context.Context, chainId
 }
 
 // ReturnNonceWithResponse request returning *ReturnNonceResponse
-func (c *ClientWithResponses) ReturnNonceWithResponse(ctx context.Context, chainId uint64, address Address, nonce uint64, params *ReturnNonceParams, reqEditors ...RequestEditorFn) (*ReturnNonceResponse, error) {
-	rsp, err := c.ReturnNonce(ctx, chainId, address, nonce, params, reqEditors...)
+func (c *ClientWithResponses) ReturnNonceWithResponse(ctx context.Context, chainId uint64, address Address, nonce uint64, reqEditors ...RequestEditorFn) (*ReturnNonceResponse, error) {
+	rsp, err := c.ReturnNonce(ctx, chainId, address, nonce, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
 	return ParseReturnNonceResponse(rsp)
+}
+
+// ReturnNonceWithSignerWithResponse request returning *ReturnNonceWithSignerResponse
+func (c *ClientWithResponses) ReturnNonceWithSignerWithResponse(ctx context.Context, chainId uint64, address Address, nonce uint64, params *ReturnNonceWithSignerParams, reqEditors ...RequestEditorFn) (*ReturnNonceWithSignerResponse, error) {
+	rsp, err := c.ReturnNonceWithSigner(ctx, chainId, address, nonce, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReturnNonceWithSignerResponse(rsp)
 }
 
 // ParseGetNonceResponse parses an HTTP response from a GetNonceWithResponse call
@@ -510,6 +700,32 @@ func ParseGetNonceResponse(rsp *http.Response) (*GetNonceResponse, error) {
 	}
 
 	response := &GetNonceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NonceResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetNonceWithSignerResponse parses an HTTP response from a GetNonceWithSignerWithResponse call
+func ParseGetNonceWithSignerResponse(rsp *http.Response) (*GetNonceWithSignerResponse, error) {
+	bodyBytes, err := ioutil.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetNonceWithSignerResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -559,17 +775,39 @@ func ParseReturnNonceResponse(rsp *http.Response) (*ReturnNonceResponse, error) 
 	return response, nil
 }
 
+// ParseReturnNonceWithSignerResponse parses an HTTP response from a ReturnNonceWithSignerWithResponse call
+func ParseReturnNonceWithSignerResponse(rsp *http.Response) (*ReturnNonceWithSignerResponse, error) {
+	bodyBytes, err := ioutil.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ReturnNonceWithSignerResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Retrieves the next available nonce
 	// (POST /nonce/{chainId}/{address})
-	GetNonce(ctx echo.Context, chainId uint64, address Address, params GetNonceParams) error
+	GetNonce(ctx echo.Context, chainId uint64, address Address) error
+	// Retrieves the next available nonce
+	// (POST /nonce/{chainId}/{address}/signed)
+	GetNonceWithSigner(ctx echo.Context, chainId uint64, address Address, params GetNonceWithSignerParams) error
 	// Synchronize nonce with blockchain
 	// (POST /nonce/{chainId}/{address}/sync)
 	SyncNonce(ctx echo.Context, chainId uint64, address Address) error
 	// Returns unused nonce
 	// (PUT /nonce/{chainId}/{address}/{nonce})
-	ReturnNonce(ctx echo.Context, chainId uint64, address Address, nonce uint64, params ReturnNonceParams) error
+	ReturnNonce(ctx echo.Context, chainId uint64, address Address, nonce uint64) error
+	// Returns unused nonce
+	// (PUT /nonce/{chainId}/{address}/{nonce}/signed)
+	ReturnNonceWithSigner(ctx echo.Context, chainId uint64, address Address, nonce uint64, params ReturnNonceWithSignerParams) error
 }
 
 // ServerInterfaceWrapper converts echo contexts to parameters.
@@ -596,8 +834,36 @@ func (w *ServerInterfaceWrapper) GetNonce(ctx echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter address: %s", err))
 	}
 
+	ctx.Set(BearerAuthScopes, []string{""})
+
+	// Invoke the callback with all the unmarshalled arguments
+	err = w.Handler.GetNonce(ctx, chainId, address)
+	return err
+}
+
+// GetNonceWithSigner converts echo context to params.
+func (w *ServerInterfaceWrapper) GetNonceWithSigner(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "chainId" -------------
+	var chainId uint64
+
+	err = runtime.BindStyledParameterWithLocation("simple", false, "chainId", runtime.ParamLocationPath, ctx.Param("chainId"), &chainId)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter chainId: %s", err))
+	}
+
+	// ------------- Path parameter "address" -------------
+	var address Address
+
+	err = runtime.BindStyledParameterWithLocation("simple", false, "address", runtime.ParamLocationPath, ctx.Param("address"), &address)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter address: %s", err))
+	}
+
+	ctx.Set(BearerAuthScopes, []string{""})
+
 	// Parameter object where we will unmarshal all parameters from the context
-	var params GetNonceParams
+	var params GetNonceWithSignerParams
 
 	headers := ctx.Request().Header
 	// ------------- Required header parameter "X-NONCE-AUTH-HASH" -------------
@@ -653,7 +919,7 @@ func (w *ServerInterfaceWrapper) GetNonce(ctx echo.Context) error {
 	}
 
 	// Invoke the callback with all the unmarshalled arguments
-	err = w.Handler.GetNonce(ctx, chainId, address, params)
+	err = w.Handler.GetNonceWithSigner(ctx, chainId, address, params)
 	return err
 }
 
@@ -675,6 +941,8 @@ func (w *ServerInterfaceWrapper) SyncNonce(ctx echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter address: %s", err))
 	}
+
+	ctx.Set(BearerAuthScopes, []string{""})
 
 	// Invoke the callback with all the unmarshalled arguments
 	err = w.Handler.SyncNonce(ctx, chainId, address)
@@ -708,8 +976,44 @@ func (w *ServerInterfaceWrapper) ReturnNonce(ctx echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter nonce: %s", err))
 	}
 
+	ctx.Set(BearerAuthScopes, []string{""})
+
+	// Invoke the callback with all the unmarshalled arguments
+	err = w.Handler.ReturnNonce(ctx, chainId, address, nonce)
+	return err
+}
+
+// ReturnNonceWithSigner converts echo context to params.
+func (w *ServerInterfaceWrapper) ReturnNonceWithSigner(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "chainId" -------------
+	var chainId uint64
+
+	err = runtime.BindStyledParameterWithLocation("simple", false, "chainId", runtime.ParamLocationPath, ctx.Param("chainId"), &chainId)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter chainId: %s", err))
+	}
+
+	// ------------- Path parameter "address" -------------
+	var address Address
+
+	err = runtime.BindStyledParameterWithLocation("simple", false, "address", runtime.ParamLocationPath, ctx.Param("address"), &address)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter address: %s", err))
+	}
+
+	// ------------- Path parameter "nonce" -------------
+	var nonce uint64
+
+	err = runtime.BindStyledParameterWithLocation("simple", false, "nonce", runtime.ParamLocationPath, ctx.Param("nonce"), &nonce)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter nonce: %s", err))
+	}
+
+	ctx.Set(BearerAuthScopes, []string{""})
+
 	// Parameter object where we will unmarshal all parameters from the context
-	var params ReturnNonceParams
+	var params ReturnNonceWithSignerParams
 
 	headers := ctx.Request().Header
 	// ------------- Required header parameter "X-NONCE-AUTH-HASH" -------------
@@ -765,7 +1069,7 @@ func (w *ServerInterfaceWrapper) ReturnNonce(ctx echo.Context) error {
 	}
 
 	// Invoke the callback with all the unmarshalled arguments
-	err = w.Handler.ReturnNonce(ctx, chainId, address, nonce, params)
+	err = w.Handler.ReturnNonceWithSigner(ctx, chainId, address, nonce, params)
 	return err
 }
 
@@ -798,28 +1102,31 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	}
 
 	router.POST(baseURL+"/nonce/:chainId/:address", wrapper.GetNonce)
+	router.POST(baseURL+"/nonce/:chainId/:address/signed", wrapper.GetNonceWithSigner)
 	router.POST(baseURL+"/nonce/:chainId/:address/sync", wrapper.SyncNonce)
 	router.PUT(baseURL+"/nonce/:chainId/:address/:nonce", wrapper.ReturnNonce)
+	router.PUT(baseURL+"/nonce/:chainId/:address/:nonce/signed", wrapper.ReturnNonceWithSigner)
 
 }
 
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/+RUUY7bNhC9CjHNp2xpvc4uoq86iZMNim4KO2kDBFtgTI0tJhKpkpTWrqDD9AA9RS5W",
-	"kJKjeGMnWuRv+2dT5Myb9968GrjKCyVJWgNxDQVqzMmS9v/eXSvJaVba9ApN6k6EhBhSwoQ0BCAxJ4jh",
-	"3ej69fWz+Wj29s3V6Gq2vIIANP1VCk0JxFaXFIDhKeXoSthd4R4Zq4XcQNMEX7RZio1EW2oa1mv56uX1",
-	"7M3bxfyHGpIe3m2++GarR5rWEMNPYc9q2H414SxJNBkDjUPQHbo3+/O4BtpiXmSucbR9OpmeP548Pn92",
-	"efaCzyaXq/n0bBJdzJ9OLp+cz6dTOnu+vlhdPIcACrSWtMP/Z7R9j6P1bPQiGj25qadR8wiCuwQE4Mdf",
-	"kCmUNJ7qQquCtBXkYWCPaNBAAfAUhXyVuBdrpXO0EEMppL2Y9u2FtLQh7a5L13/Y5ebzkVp9IG5b+oRc",
-	"K/eeK2mRW89djiKDGCrkGVbjAqtMyJ837nTMVd5r+vunf9wN9htW2ad/pcOTkOFaFFYoR+LcpqSpzNkf",
-	"mGVkmWeL/YoSN6QZZpm6NWytNLMa+UchN8zPY5hVDCslEsZVlgkjlDRuImG9pAdlIICKtGkbRuNofOZw",
-	"qIIkFgJiOB9H40krbeqFCH2PsO6YbsK6U6nx+injSTgcZEFWC6ocspSYpK1lWKHIcJVRi5mhTFhZJGi7",
-	"S59Hcgw7bVwlD0z7305jeEnWD+Px9Xnxvlsih7mne2+mH1+b4Gj9vfW+VX+IzY6j6OcL74ThvV70uXbv",
-	"Zw7djRuu3VZvhkkU7d1P0guPRZEJ7iUKPxinfj2Q38Ms8Nt16KLXv/gtNGWeo94NspUjGDfOEt2q37gK",
-	"py0cmp3kp3283EmeaiXF32Q638oyX5Fmt8KmbJUp/tEX9XZWFelbLbyjh7jZVX9wdj7hmO8o+wXRHc93",
-	"CL63sLX/1GZUeTyiSi0NK2VpKOmaWnUyi3zurkvtIpqVhr5Ssy34EOPpSPH9sv3vku/7CfWVq45Zt2n+",
-	"CwAA//+JYBgRAAsAAA==",
+	"H4sIAAAAAAAC/+RV4W7bNhB+FYLrT9lSHDdB9Wtu6zbFsHSI27VAkAFn6myxlUiNpJR4hh5mD7Cn6IsN",
+	"R8lRnCaNvKLZlv6zKd7dd9/3HW/Nhc4LrVA5y+M1L8BAjg6N//f+WCuBk9KlR2BTOpGKxzxFSNDwgCvI",
+	"kcf8/eD49fGz6WDy9s3R4GgyO+IBN/h7KQ0mPHamxIBbkWIOlMKtCgqyzki15HUdXCkzk0sFrjTYr9bs",
+	"1cvjyZu3J9OvKoimf7XpyRdLPTK44DH/IexYDZuvNpwkiUFreU0I2kOK2ZzHa44XkBcZFY4uno7G+49H",
+	"j/efHe69EJPR4Xw63htFB9Ono8Mn+9PxGPeeLw7mB895wAtwDg3h/y26OIXBYjJ4EQ2enK3HUf2IB9cJ",
+	"CLhv/wRtoZX1VBdGF2icRA8DOkS9Ggq4SEGqVwlFLLTJwfGYl1K5g3FXXiqHSzR0XVH9fpfryyM9/4DC",
+	"+ROLojTSrWaEpME8RzBoSFL65yFSUHPc5U2dKxoFpFpouiq0ciCcpz8HmfGYVyAyqIYFVJlUPy7pdCh0",
+	"3tni109/0g32C1TZp78UtZSgFUYWTmrSYepSNFjm7B1kGTrmCWc/g4IlGgZZps8tW2jDnAHxUaol85RY",
+	"5jSDSsuECZ1l0kqtLIGXzrtiKw0PeIXGNgWjYTTcIxy6QAWF5DHfH0bDUeOO1FMU+hrhuhWrDtet0LW3",
+	"gLaehO1GTtAZiRUhS5EpvHAMKpAZzDNsMDNQCSuLBFx76bIlYpjkpUwemPG/ySb8JTrfjMfXPTmn7RwS",
+	"5o7ujR+/fvKCG/Nv3Pul/D2cekbxzUx5vkdRtDEYKs8tFEUmhWch/GCJ4HXPFrYn1ht4W6jXP21Nhqfy",
+	"6kycnhE+W+Y5mFUvYalFWJIo7byeUYHbTRRaekuTf89L7+Tle/6AXBXcjKLrL7y2pXeK6BbuzmGE7j9h",
+	"+W/q6ZUStzt6tlIiNVrJP9C2DlZlPkfDzqVL2TzT4qNP6o2tKzTnRnpv9/E1Zf9eHsk7lL1CdMvzNYJ3",
+	"FnbtPzWbr7z5sSqNsqxUpcWkLer0ra+S3+aL0tDiZ6XFz9RsEj44PW9Ovhm2+7PKDnvvM13/qXmubrz7",
+	"9tCDXXbfyk3/xz16977r5eW75qP+OwAA//8qUzKoBhAAAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

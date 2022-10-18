@@ -9,6 +9,8 @@ type Server struct {
 	Hostname string `json:"hostname"`
 	Port     int    `json:"port"`
 	LogLevel string `json:"logLevel"`
+	CertPath string `json:"certPath"`
+	KeyPath  string `json:"keyPath"`
 }
 
 type Rpc struct {
@@ -23,6 +25,7 @@ type NonceManagerConfig struct {
 	StorageType   string      `json:"storageType"`
 	StorageConfig interface{} `json:"storageConfig"`
 	AuthBySig     bool        `json:"authBySig"`
+	ApiKey        string      `json:"apiKey"`
 }
 
 type WalletManagerConfig struct {

@@ -146,6 +146,9 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+	// Health request
+	Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// NewSigner request with any body
 	NewSignerWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -160,6 +163,18 @@ type ClientInterface interface {
 	ReplaceKeyWithBody(ctx context.Context, address Address, params *ReplaceKeyParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	ReplaceKey(ctx context.Context, address Address, params *ReplaceKeyParams, body ReplaceKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+func (c *Client) Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewHealthRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 func (c *Client) NewSignerWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -232,6 +247,33 @@ func (c *Client) ReplaceKey(ctx context.Context, address Address, params *Replac
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewHealthRequest generates requests for Health
+func NewHealthRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/signer/health")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
 }
 
 // NewNewSignerRequest calls the generic NewSigner builder with application/json body
@@ -429,6 +471,9 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
+	// Health request
+	HealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*HealthResponse, error)
+
 	// NewSigner request with any body
 	NewSignerWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*NewSignerResponse, error)
 
@@ -443,6 +488,27 @@ type ClientWithResponsesInterface interface {
 	ReplaceKeyWithBodyWithResponse(ctx context.Context, address Address, params *ReplaceKeyParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceKeyResponse, error)
 
 	ReplaceKeyWithResponse(ctx context.Context, address Address, params *ReplaceKeyParams, body ReplaceKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceKeyResponse, error)
+}
+
+type HealthResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r HealthResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r HealthResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
 }
 
 type NewSignerResponse struct {
@@ -510,6 +576,15 @@ func (r ReplaceKeyResponse) StatusCode() int {
 	return 0
 }
 
+// HealthWithResponse request returning *HealthResponse
+func (c *ClientWithResponses) HealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*HealthResponse, error) {
+	rsp, err := c.Health(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseHealthResponse(rsp)
+}
+
 // NewSignerWithBodyWithResponse request with arbitrary body returning *NewSignerResponse
 func (c *ClientWithResponses) NewSignerWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*NewSignerResponse, error) {
 	rsp, err := c.NewSignerWithBody(ctx, contentType, body, reqEditors...)
@@ -559,6 +634,22 @@ func (c *ClientWithResponses) ReplaceKeyWithResponse(ctx context.Context, addres
 		return nil, err
 	}
 	return ParseReplaceKeyResponse(rsp)
+}
+
+// ParseHealthResponse parses an HTTP response from a HealthWithResponse call
+func ParseHealthResponse(rsp *http.Response) (*HealthResponse, error) {
+	bodyBytes, err := ioutil.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &HealthResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
 }
 
 // ParseNewSignerResponse parses an HTTP response from a NewSignerWithResponse call
@@ -631,6 +722,9 @@ func ParseReplaceKeyResponse(rsp *http.Response) (*ReplaceKeyResponse, error) {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Health check endpoint
+	// (GET /signer/health)
+	Health(ctx echo.Context) error
 	// Creates new signer
 	// (POST /signer/new)
 	NewSigner(ctx echo.Context) error
@@ -645,6 +739,15 @@ type ServerInterface interface {
 // ServerInterfaceWrapper converts echo contexts to parameters.
 type ServerInterfaceWrapper struct {
 	Handler ServerInterface
+}
+
+// Health converts echo context to params.
+func (w *ServerInterfaceWrapper) Health(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshalled arguments
+	err = w.Handler.Health(ctx)
+	return err
 }
 
 // NewSigner converts echo context to params.
@@ -760,6 +863,7 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 		Handler: si,
 	}
 
+	router.GET(baseURL+"/signer/health", wrapper.Health)
 	router.POST(baseURL+"/signer/new", wrapper.NewSigner)
 	router.POST(baseURL+"/signer/:address/bytes", wrapper.SignBytes)
 	router.PUT(baseURL+"/signer/:address/key", wrapper.ReplaceKey)
@@ -769,19 +873,20 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/+xUUU7jSBC9SquWT5M4TgDhr00grBCrXbS72v1ArFSxK3GD3d3TXUnIRDnMHGBOwcVG",
-	"3XYIAQYiDTNf8+dU7PdevXpVS8h0ZbQixQ7SJbisoArDYz/PLbnwSHdYmZIghfhukPS6B8lB9+Soc5b1",
-	"k6PRsNdJ4sPhIDk67g57Peqcjg9Hh6cQgUFmsgpS+D++u8L9cX//LN4/vl724tUeRMAL4zEdW6kmsIrg",
-	"D5r/LSeKbBLHntdYbciypKDCTEelzC5o4X/sWRpDCr+0N/rbjfj2Wvlq9cChRzeUsefwBIMFN5BbBKN1",
-	"eaxthQxpqDwX+irsi9Kd7yo/RcZvgCfb9L6NfVsXK6l+JzXhAtJusgOmL0k11v7bTCvGjMOoK5QlpDDD",
-	"rMRZy+CslOrXia+2Ml1BBAorj/Pv/Sf/hrjEWXn/WXmRObnMSsNS+5kPuSBL00r8h2VJLOoWRIUKJ+TE",
-	"PFSdQJULLkhaYaycIZO4pUVd9q454UixyL11EbDkEMMaCyKYkXU1XdyKWx2vQhtSaCSk0G3FraTOYRGs",
-	"aoc52LaiefBRu9Dztu7fSJFFJicUzRuZQU6FxgnJgrVAMZEzUqJ/ee7lQmC16BHOc0g3QYYILH2YkuOB",
-	"zhdrr0kFXjSmlFn4qn3jPPl6Ad9K+CYOYY6eQlrKIWU7pVBwRitXB6RJ5LsQb21o4N4278+LkDU3rSq0",
-	"C0jhxNKDl25tCePEQXoFTeHaf7KezRLr7V21H9bx5TkFHU6Et+qQSCVG3uWn09isvM+CxYqYrBewBOmR",
-	"CsI86Gqi3Z9yoa38GBDgqb3RI6uebVmD6BO3wWs6ehVpt3t2/f3iVBv0g+O0dTV3idPjoe8cpOZCmukL",
-	"KfqnkE5UxIXOBZalnjt/jYSe+1vFWljN/ib52teW/S8yJWZ0Ef76ma93OldvBKEx/clgnudhtfoSAAD/",
-	"/+EgNMvjCAAA",
+	"H4sIAAAAAAAC/+xV0W7jNhD8FWJ7j4qtyL4Ep6faF197SNEe2qJ9OKTAWlpLvEgkS9J2XEMf0w/oV9yP",
+	"FUtJ9tkxEgNN+9Q3hzFnZmeH4y1kujZakfIO0i24rKQaw8dJnlty4SM9YG0qghTih2kyHr1OXo/eXl++",
+	"yybJ9Xw2vkziq9k0uX4zmo3HdHmzuJpf3UAEBr0nqyCF3+KHj3ixmFy8iy/e3G3HcfMKIvAbw5jOW6kK",
+	"aCL4ntY/yUKRTeKYeY3VhqyXFFSY5byS2S1t+I9XlhaQwlfDvf5hJ37YK2+aHYeef6LMMwcTTDe+gzwg",
+	"mPfHC21r9JCGk8dCn4Q9Kd3xVPkNevwH8GS72Q+x79vDWqrvSBW+hHSUnIHJR1ItNN/NtPKY+bDqGmUF",
+	"Kawwq3A1MLiqpPq64NNBpmuIQGHNOL98/pO/IT7gqvr8l2KRObnMSuOl5p3PfEmWlrX4FauKvGhHEDUq",
+	"LMiJdTh1AlUufEnSCmPlCj2Je9q0x+yaE46UFzlbF4GXPsSwxYIIVmRdSxcP4sElq9CGFBoJKYwG8SBp",
+	"c1gGq4ZhD3ZYElZs1BYKClMfKp+Imnypc+G1yErK7oVcsEYx+fBeSCcsYVYSzisKMlu0DQRqiwzyPocU",
+	"vm1ZIrDkjFauXVeXj0PGH27DityyrtFudnc7dlK50VJ5NgALB+nHNlAW7vhWP5WidUiHdidm+oYUayMn",
+	"FK0784P6Go0T0vOsKAq5IhXG5FQdD7R7nmGm35fk/FTnmz5BpAIvGlPJLNwafnJM3tfKc+92H/KQTqaQ",
+	"lnJIvV1Sc9rHFyE+6J3A/cx63lraeel6S57azRbbTmqGu5I5vaegw4nwrTb6Uok5u3y8jX2RccIt1uTJ",
+	"soAtSEYqCfOgq3uwk6UvtZV/BAQ4tjf6wqpH3dEh8jva43UTPYl0Xkvf/Xtxag36j+N08FtwTpy+XPrZ",
+	"Qep63yxPpOjnUrq+xLCq9NqF/tJrbmCvhdWem7bvtFOP/UcyFWZ0G/71f75eqK6eCUJn+tFiHuehaf4O",
+	"AAD//3kkHZa5CQAA",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

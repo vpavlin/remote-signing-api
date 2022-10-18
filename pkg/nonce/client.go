@@ -2,69 +2,53 @@ package nonce
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
-	"time"
-
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/vpavlin/remote-signing-api/pkg/signer"
 )
 
-type ClientWithSigner struct {
-	nonceClient  *ClientWithResponses
-	signerClient *signer.ClientWithResponses
+type NonceClient struct {
+	nonceClient *ClientWithResponses
+	apiKey      string
 }
 
-func NewNonceClientWithSigner(server string) (*ClientWithSigner, error) {
-	client := new(ClientWithSigner)
-	nonceClient, err := NewClientWithResponses(server)
+func NewNonceClient(server string, insecureSkipVerify bool, apiKey string) (*NonceClient, error) {
+	skipVerify := func(c *Client) error {
+		if insecureSkipVerify && c.Client == nil {
+			tr := &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			}
+			c.Client = &http.Client{Transport: tr}
+		}
+
+		return nil
+	}
+
+	nonceClient, err := NewClientWithResponses(server, skipVerify)
 	if err != nil {
 		return nil, err
 	}
 
-	client.nonceClient = nonceClient
-
-	signerClient, err := signer.NewClientWithResponses(server)
-	if err != nil {
-		return nil, err
-	}
-
-	client.signerClient = signerClient
-
-	return client, nil
-
+	return &NonceClient{
+		nonceClient: nonceClient,
+		apiKey:      apiKey,
+	}, nil
 }
 
-func (c *ClientWithSigner) GetNonceWithSigner(chainId uint64, address string, apiKey string) (uint64, func() error, error) {
-	hash := c.getHash(chainId, address)
-
-	response, err := c.signerClient.SignBytesWithResponse(
-		context.Background(),
-		address,
-		&signer.SignBytesParams{Authorization: fmt.Sprintf("Bearer %s", apiKey)},
-		signer.SignBytesJSONRequestBody{Bytes: &hash},
-	)
-
+func (c *NonceClient) GetNonce(chainId uint64, address string) (uint64, func() error, error) {
+	responseNonce, err := c.nonceClient.GetNonceWithResponse(context.Background(), chainId, address, c.addAuth)
 	if err != nil {
 		return 0, nil, err
 	}
 
-	signature := response.JSON200.SignedData
-
-	params := new(GetNonceParams)
-	params.XNONCEAUTHHASH = signer.BytesToString(hash)
-	params.XNONCEAUTHSIGNATURE = signer.BytesToString(*signature)
-	params.XNONCEAUTHSIGNER = address
-
-	responseNonce, err := c.nonceClient.GetNonceWithResponse(context.Background(), chainId, address, params)
-	if err != nil {
-		return 0, nil, err
+	if responseNonce.StatusCode() != 200 {
+		return 0, nil, fmt.Errorf("Failed to get nonce for %s (%d) - code: %d", address, chainId, responseNonce.StatusCode())
 	}
 
 	fn := func() error {
 		nonceToReturn := *responseNonce.JSON200.Nonce
 
-		response, err := c.nonceClient.ReturnNonce(context.Background(), chainId, address, nonceToReturn, (*ReturnNonceParams)(params))
+		response, err := c.nonceClient.ReturnNonce(context.Background(), chainId, address, nonceToReturn, c.addAuth)
 		if err != nil {
 			return err
 		}
@@ -79,8 +63,20 @@ func (c *ClientWithSigner) GetNonceWithSigner(chainId uint64, address string, ap
 	return *responseNonce.JSON200.Nonce, fn, nil
 }
 
-func (c *ClientWithSigner) getHash(chainId uint64, address string) []byte {
-	message := fmt.Sprintf("%d-%s-%s-%d", chainId, address, "getNonce", time.Now().Unix())
-	hash := crypto.Keccak256Hash([]byte(message))
-	return hash.Bytes()
+func (c *NonceClient) ReturnNonce(chainId uint64, address string, nonce uint64) error {
+	response, err := c.nonceClient.ReturnNonce(context.Background(), chainId, address, nonce, c.addAuth)
+	if err != nil {
+		return err
+	}
+
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("Failed to return nonce %d for %d - %s with code %d", nonce, chainId, address, response.StatusCode)
+	}
+
+	return nil
+}
+
+func (c *NonceClient) addAuth(ctx context.Context, req *http.Request) error {
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.apiKey))
+	return nil
 }

@@ -82,7 +82,7 @@ func signBytes() {
 
 	rtx, err := c.SignBytesWithResponse(context.Background(), opts.Address, &params, body)
 	if rtx.StatusCode() != http.StatusOK {
-		log.Fatal("Status not 200: %s", rtx.Status())
+		log.Fatalf("Status not 200: %s", rtx.Status())
 	}
 
 	ok, err := signer.IsValidSignature(opts.Address, hash, *rtx.JSON200.SignedData)
@@ -114,7 +114,7 @@ func signTX() {
 		log.Fatal(err)
 	}
 
-	sc, err := signer.NewTransactionClient(URL)
+	sc, err := signer.NewTransactionClient(URL, true)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func signTX() {
 		//log.Fatalf("Only callable by the creator!")
 	}
 
-	nonceClient, err := nonce.NewNonceClientWithSigner(URL)
+	nonceClient, err := nonce.NewNonceClientWithSigner(URL, true)
 	if err != nil {
 		log.Fatal(err)
 	}

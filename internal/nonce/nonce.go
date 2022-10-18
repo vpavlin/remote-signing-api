@@ -187,10 +187,11 @@ func (n *Nonce) DecreaseNonce() error {
 }
 
 func (n *Nonce) autoSync(client *ethclient.Client, syncInterval time.Duration, syncAfter time.Duration) error {
+	logrus.Info("Starting AutoSync")
 	for {
 		select {
 		case <-time.After(syncInterval):
-			logrus.Debug(n.lastUsed, " + ", int64(syncAfter.Seconds()), " = ", n.lastUsed+int64(syncAfter.Seconds()), " < ", time.Now().Unix())
+			//logrus.Debug(n.lastUsed, " + ", int64(syncAfter.Seconds()), " = ", n.lastUsed+int64(syncAfter.Seconds()), " < ", time.Now().Unix())
 			if n.lastUsed+int64(syncAfter.Seconds()) < time.Now().Unix() {
 				logrus.WithFields(logrus.Fields{
 					"address": n.Address,
@@ -199,7 +200,7 @@ func (n *Nonce) autoSync(client *ethclient.Client, syncInterval time.Duration, s
 				err := n.Sync(client)
 				if err != nil {
 					logrus.Errorf("AutoSync: %s\n", err)
-					return err
+					//return err //TODO: should not return
 				}
 			}
 		}
