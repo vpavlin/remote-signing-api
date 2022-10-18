@@ -3,8 +3,6 @@ name: build-pr
 on:
   pull_request:
 
-  
-
 jobs:
   build:
     runs-on: ubuntu-20.04
@@ -13,7 +11,7 @@ jobs:
         with:
           fetch-depth: 1
       - name: Run Makefile
-        run: make release-pr VERSION=pr-${PR_NUMBER} QUAY_USER=${QUAY_USER} QUAY_PASSWORD=${QUAY_PASSWORD}
+        run: make release-pr VERSION=pr-${PR_NUMBER} QUAY_USER=${QUAY_USER} QUAY_PASSWORD=${QUAY_PASSWORD} LABEL="--label quay.expires-after=7d"
         env: # Or as an environment variable
           QUAY_PASSWORD: ${{ secrets.QUAY_PASSWORD }}
           QUAY_USER: ${{ secrets.QUAY_USER }}
