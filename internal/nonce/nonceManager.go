@@ -94,23 +94,31 @@ func (nm *NonceManager) Sync(chainId ChainID, address string, contract *string) 
 }
 
 func (nm *NonceManager) getNonceObject(chainId ChainID, address string, contract *string) (*Nonce, error) {
+	logger := logrus.WithFields(logrus.Fields{
+		"address": address,
+		"chainId": chainId,
+	})
+
+	if contract != nil {
+		logger = logger.WithField("contract", *contract)
+	}
+
 	an, ok := nm.ChainNonces[chainId]
 	if !ok {
-		logrus.WithFields(logrus.Fields{
-			"address": address,
-			"chainId": chainId,
-		}).Info("Initializing new chainID")
+		logger.Info("Initializing new chainID")
 		an = new(AddressedNonces)
 		an.Nonces = make(map[string]*Nonce)
 		nm.ChainNonces[chainId] = an
 	}
 
-	nonce, ok := an.Nonces[address]
+	nonceId := address
+	if contract != nil {
+		nonceId = fmt.Sprintf("%s-%s", *contract, address)
+	}
+
+	nonce, ok := an.Nonces[nonceId]
 	if !ok {
-		logrus.WithFields(logrus.Fields{
-			"address": address,
-			"chainId": chainId,
-		}).Info("Setting up new nonce")
+		logger.Info("Setting up new nonce")
 
 		client, ok := nm.clients[chainId]
 		if !ok {
@@ -126,7 +134,7 @@ func (nm *NonceManager) getNonceObject(chainId ChainID, address string, contract
 		if err != nil {
 			return nil, err
 		}
-		an.Nonces[address] = nonce
+		an.Nonces[nonceId] = nonce
 	}
 
 	return nonce, nil
