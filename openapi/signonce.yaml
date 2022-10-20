@@ -1,0 +1,221 @@
+openapi: '3.0.2'
+info:
+  version: 0.0.1
+  title: Signature Nonce Manager
+  description: Contract Signature Nonce Manager allows for tracking sig nonces for an address and a contract to avoid collisions
+  contact:
+    name: Václav Pavlín
+    email: vaclav.pavlin@gmail.com
+paths:
+  /signonce/{contract}/{chainId}/{address}/signed:
+    post:
+      summary: Retrieves the next available nonce
+      description: Retrieves the next available nonce and updates the tracking information
+      tags:
+      - nonce
+      operationId: getNonceWithSigner
+      parameters:
+        - name: contract
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Address"
+        - name: address
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Address"
+        - name: chainId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: uint64
+        - $ref: "#/components/parameters/XNonceAuthHash"
+        - $ref: "#/components/parameters/XNonceAuthSignature"
+        - $ref: "#/components/parameters/XNonceAuthSigner"
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NonceResponse"
+  /signonce/{contract}/{chainId}/{address}:
+    post:
+      summary: Retrieves the next available nonce
+      description: Retrieves the next available nonce and updates the tracking information
+      security:
+        - bearerAuth: []
+      tags:
+      - nonce
+      operationId: getNonce
+      parameters:
+        - name: contract
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Address"
+        - name: address
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Address"
+        - name: chainId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: uint64
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NonceResponse"
+  /signonce/{contract}/{chainId}/{address}/{nonce}/signed:
+    put:
+      summary: Returns unused nonce
+      description: Returns unused nonce to the tracking information for further use
+      tags:
+      - nonce
+      operationId: returnNonceWithSigner
+      parameters:
+        - name: contract
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Address"
+        - name: address
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Address"
+        - name: chainId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: uint64
+        - name: nonce
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: uint64
+        - $ref: "#/components/parameters/XNonceAuthHash"
+        - $ref: "#/components/parameters/XNonceAuthSignature"
+        - $ref: "#/components/parameters/XNonceAuthSigner"
+      responses:
+        200:
+          description: OK
+  /signonce/{contract}/{chainId}/{address}/{nonce}:
+    put:
+      summary: Returns unused nonce
+      description: Returns unused nonce to the tracking information for further use
+      security:
+        - bearerAuth: []
+      tags:
+      - nonce
+      operationId: returnNonce
+      parameters:
+        - name: contract
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Address"
+        - name: address
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Address"
+        - name: chainId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: uint64
+        - name: nonce
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: uint64
+      responses:
+        200:
+          description: OK
+            
+  /signonce/{contract}/{chainId}/{address}/sync:
+    post:
+      summary: Synchronize nonce with blockchain
+      description: Synchronizes nonce number with blockchain and overwrites tracking information
+      tags:
+      - nonce
+      operationId: syncNonce
+      parameters:
+        - name: contract
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Address"
+        - name: address
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/Address"
+        - name: chainId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: uint64
+      responses:
+        200:
+          description: OK
+
+
+components:
+  schemas:
+    Address:
+      type: string
+      pattern: '^0x[a-fA-F0-9]{40}$'
+      example: "0xB2435253C71FcA27bE41206EB2793E44e1Df6b6D"
+    NonceResponse:
+      type: object
+      properties:
+        nonce:
+          type: integer
+          format: uint64
+        address:
+          $ref: "#/components/schemas/Address"
+        chainId:
+          type: integer
+          format: uint64 
+  parameters:
+    XNonceAuthHash:
+      in: header
+      name: X-NONCE-AUTH-HASH
+      required: true
+      schema:
+        type: string
+    XNonceAuthSigner:
+      in: header
+      name: X-NONCE-AUTH-SIGNER
+      required: true
+      schema:
+        $ref: "#/components/schemas/Address"
+    XNonceAuthSignature:
+      in: header
+      name: X-NONCE-AUTH-SIGNATURE
+      required: true
+      schema:
+        type: string
+  securitySchemes:
+    bearerAuth:
+      scheme: bearer
+      type: http
+
+
+security:
+  - bearerAuth: []

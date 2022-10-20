@@ -8,17 +8,13 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/vpavlin/remote-signing-api/config"
 	"github.com/vpavlin/remote-signing-api/internal/nonce"
-	nonceServer "github.com/vpavlin/remote-signing-api/pkg/nonce"
 	"github.com/vpavlin/remote-signing-api/pkg/signer"
+	signonceServer "github.com/vpavlin/remote-signing-api/pkg/signonce"
 )
 
-type ErrorResponse struct {
-	Error string `json:"error"`
-}
+type SigNonceHandler struct{}
 
-type NonceHandler struct{}
-
-func SetupNonce(e *echo.Echo, config *config.Config) {
+func SetupSigNonce(e *echo.Echo, config *config.Config) {
 	g := e.Group("")
 
 	nm, err := nonce.NewNonceManager(config.RpcUrls, config.NonceManager)
@@ -77,17 +73,17 @@ func SetupNonce(e *echo.Echo, config *config.Config) {
 			}))
 	}
 
-	nh := new(NonceHandler)
+	nh := SigNonceHandler{}
 
-	nonceServer.RegisterHandlers(g, nh)
+	signonceServer.RegisterHandlers(g, &nh)
 }
 
-func (nh NonceHandler) GetNonceWithSigner(ctx echo.Context, chainId uint64, address string, params nonceServer.GetNonceWithSignerParams) error {
+func (nh SigNonceHandler) GetNonceWithSigner(ctx echo.Context, contract string, chainId uint64, address string, params signonceServer.GetNonceWithSignerParams) error {
 	nm := ctx.Get("NonceManager").(*nonce.NonceManager)
 
-	resp := &nonceServer.NonceResponse{}
+	resp := &signonceServer.NonceResponse{}
 
-	nonce, err := nm.GetNonce(nonce.ChainID(chainId), address, nil)
+	nonce, err := nm.GetNonce(nonce.ChainID(chainId), address, &contract)
 	if err != nil {
 		ctx.Error(err)
 		return ctx.JSON(http.StatusInternalServerError, &ErrorResponse{Error: err.Error()})
@@ -100,10 +96,10 @@ func (nh NonceHandler) GetNonceWithSigner(ctx echo.Context, chainId uint64, addr
 	return ctx.JSON(http.StatusOK, resp)
 }
 
-func (nh NonceHandler) ReturnNonceWithSigner(ctx echo.Context, chainId uint64, address string, nonceI uint64, params nonceServer.ReturnNonceWithSignerParams) error {
+func (nh SigNonceHandler) ReturnNonceWithSigner(ctx echo.Context, contract string, chainId uint64, address string, nonceI uint64, params signonceServer.ReturnNonceWithSignerParams) error {
 	nm := ctx.Get("NonceManager").(*nonce.NonceManager)
 
-	err := nm.ReturnNonce(nonceI, nonce.ChainID(chainId), address, nil)
+	err := nm.ReturnNonce(nonceI, nonce.ChainID(chainId), address, &contract)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, &ErrorResponse{Error: err.Error()})
 	}
@@ -111,12 +107,12 @@ func (nh NonceHandler) ReturnNonceWithSigner(ctx echo.Context, chainId uint64, a
 	return ctx.NoContent(http.StatusOK)
 }
 
-func (nh NonceHandler) GetNonce(ctx echo.Context, chainId uint64, address string) error {
+func (nh SigNonceHandler) GetNonce(ctx echo.Context, contract string, chainId uint64, address string) error {
 	nm := ctx.Get("NonceManager").(*nonce.NonceManager)
 
-	resp := &nonceServer.NonceResponse{}
+	resp := &signonceServer.NonceResponse{}
 
-	nonce, err := nm.GetNonce(nonce.ChainID(chainId), address, nil)
+	nonce, err := nm.GetNonce(nonce.ChainID(chainId), address, &contract)
 	if err != nil {
 		ctx.Error(err)
 		return ctx.JSON(http.StatusInternalServerError, &ErrorResponse{Error: err.Error()})
@@ -129,10 +125,10 @@ func (nh NonceHandler) GetNonce(ctx echo.Context, chainId uint64, address string
 	return ctx.JSON(http.StatusOK, resp)
 }
 
-func (nh NonceHandler) ReturnNonce(ctx echo.Context, chainId uint64, address string, nonceI uint64) error {
+func (nh SigNonceHandler) ReturnNonce(ctx echo.Context, contract string, chainId uint64, address string, nonceI uint64) error {
 	nm := ctx.Get("NonceManager").(*nonce.NonceManager)
 
-	err := nm.ReturnNonce(nonceI, nonce.ChainID(chainId), address, nil)
+	err := nm.ReturnNonce(nonceI, nonce.ChainID(chainId), address, &contract)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, &ErrorResponse{Error: err.Error()})
 	}
@@ -140,10 +136,10 @@ func (nh NonceHandler) ReturnNonce(ctx echo.Context, chainId uint64, address str
 	return ctx.NoContent(http.StatusOK)
 }
 
-func (nh NonceHandler) SyncNonce(ctx echo.Context, chainId uint64, address string) error {
+func (nh SigNonceHandler) SyncNonce(ctx echo.Context, contract string, chainId uint64, address string) error {
 	nm := ctx.Get("NonceManager").(*nonce.NonceManager)
 
-	err := nm.Sync(nonce.ChainID(chainId), address, nil)
+	err := nm.Sync(nonce.ChainID(chainId), address, &contract)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, &ErrorResponse{Error: err.Error()})
 	}

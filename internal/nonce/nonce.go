@@ -9,15 +9,18 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	logrus "github.com/sirupsen/logrus"
+	"github.com/vpavlin/remote-signing-api/internal/bindings"
 	"github.com/vpavlin/remote-signing-api/internal/types"
 )
 
 const (
 	auto_sync_interval = 10 * time.Minute
 	auto_sync_after    = 1 * time.Hour
+	auto_sync_max_err  = 10
 )
 
 type INonce interface {
@@ -29,26 +32,32 @@ type INonce interface {
 type Nonce struct {
 	INonce
 	Address        string
+	Contract       *string
 	ChainId        uint64
 	nonce          uint64
 	returnedNonces types.SortedNonceArr
 	lock           sync.Mutex
 	lastUsed       int64
 	storage        types.INonceStorage
+	ErrCount       uint
 }
 
-func NewNonce(client *ethclient.Client, storage *types.INonceStorage, address common.Address, chainId uint64, autoSync bool) (*Nonce, error) {
-	return NewNonceWithConfig(client, storage, address, chainId, autoSync, auto_sync_interval, auto_sync_after)
+func NewNonce(client *ethclient.Client, storage *types.INonceStorage, address string, chainId uint64, contract *string, autoSync bool) (*Nonce, error) {
+	return NewNonceWithConfig(client, storage, address, chainId, contract, autoSync, auto_sync_interval, auto_sync_after)
 }
 
-func NewNonceWithConfig(client *ethclient.Client, storage *types.INonceStorage, address common.Address, chainId uint64, autoSync bool, syncInterval time.Duration, syncAfter time.Duration) (*Nonce, error) {
-	nonce := new(Nonce)
-	nonce.Address = address.String()
-	nonce.ChainId = chainId
-	nonce.storage = *storage
+func NewNonceWithConfig(client *ethclient.Client, storage *types.INonceStorage, address string, chainId uint64, contract *string, autoSync bool, syncInterval time.Duration, syncAfter time.Duration) (nonce *Nonce, err error) {
+
+	nonce = &Nonce{
+		Address:  address,
+		ChainId:  chainId,
+		storage:  *storage,
+		Contract: contract,
+	}
 
 	defer func() {
-		if autoSync {
+		logrus.Infof("Error: %s", err)
+		if err == nil && autoSync {
 			logrus.WithFields(logrus.Fields{
 				"address": address,
 				"chainId": chainId,
@@ -57,7 +66,7 @@ func NewNonceWithConfig(client *ethclient.Client, storage *types.INonceStorage, 
 		}
 	}()
 
-	ns, err := nonce.storage.Load(chainId, address.String())
+	ns, err := nonce.storage.Load(chainId, address, contract)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
 			return nil, err
@@ -94,12 +103,27 @@ func (n *Nonce) Sync(client *ethclient.Client) (err error) {
 	}()
 
 	n.updateLastUsed()
+	var nonce uint64
 
-	nonce, err := client.PendingNonceAt(context.Background(), common.HexToAddress(n.Address))
-	if err != nil {
-		return fmt.Errorf("GetNonce: cannot get account %s nonce, err: %s, set it to nil!",
-			n.Address, err)
+	if n.Contract != nil {
+		c, err := bindings.NewSigNonce(common.HexToAddress(*n.Contract), client)
+		if err != nil {
+			return fmt.Errorf("Failed to bound the contract %s: %s", *n.Contract, err)
+		}
+		bigNonce, err := c.SigNonce(&bind.CallOpts{}, common.HexToAddress(n.Address))
+		if err != nil {
+			return fmt.Errorf("Failed to get nonce from %s: %s", *n.Contract, err)
+		}
+
+		nonce = bigNonce.Uint64()
+	} else {
+		nonce, err = client.PendingNonceAt(context.Background(), common.HexToAddress(n.Address))
+		if err != nil {
+			return fmt.Errorf("GetNonce: cannot get account %s nonce, err: %s, set it to nil!",
+				n.Address, err)
+		}
 	}
+
 	n.nonce = nonce
 	n.returnedNonces = make(types.SortedNonceArr, 0)
 
@@ -187,19 +211,28 @@ func (n *Nonce) DecreaseNonce() error {
 }
 
 func (n *Nonce) autoSync(client *ethclient.Client, syncInterval time.Duration, syncAfter time.Duration) error {
-	logrus.Info("Starting AutoSync")
+	logger := logrus.WithFields(logrus.Fields{
+		"address": n.Address,
+		"chainId": n.ChainId,
+	})
+	if n.Contract != nil {
+		logger = logger.WithField("contract", *n.Contract)
+	}
+	logger.Info("Starting AutoSync")
 	for {
 		select {
 		case <-time.After(syncInterval):
 			//logrus.Debug(n.lastUsed, " + ", int64(syncAfter.Seconds()), " = ", n.lastUsed+int64(syncAfter.Seconds()), " < ", time.Now().Unix())
 			if n.lastUsed+int64(syncAfter.Seconds()) < time.Now().Unix() {
-				logrus.WithFields(logrus.Fields{
-					"address": n.Address,
-					"chainId": n.ChainId,
-				}).Info("Executing auto-sync")
+				logger.Info("Executing auto-sync")
 				err := n.Sync(client)
 				if err != nil {
-					logrus.Errorf("AutoSync: %s\n", err)
+					syncInterval *= 2
+					logger.Errorf("AutoSync: %s\n", err)
+					n.ErrCount++
+					if n.ErrCount > auto_sync_max_err {
+						return fmt.Errorf("Stopping the auto sync: %s", err)
+					}
 					//return err //TODO: should not return
 				}
 			}
@@ -211,6 +244,7 @@ func (n *Nonce) serialize() *types.NonceSerializable {
 	ns := new(types.NonceSerializable)
 
 	ns.Address = n.Address
+	ns.Contract = n.Contract
 	ns.ChainId = n.ChainId
 	ns.Nonce = n.nonce
 	ns.LastUsed = n.lastUsed
@@ -221,6 +255,7 @@ func (n *Nonce) serialize() *types.NonceSerializable {
 
 func (n *Nonce) deserialize(ns *types.NonceSerializable) {
 	n.Address = ns.Address
+	n.Contract = ns.Contract
 	n.ChainId = ns.ChainId
 	n.nonce = ns.Nonce
 	n.lastUsed = ns.LastUsed

@@ -34,6 +34,7 @@ func main() {
 
 	handlers.SetupNonce(e, config)
 	handlers.SetupSigner(e, config)
+	handlers.SetupSigNonce(e, config)
 
 	e.GET("/api/v1/", func(ctx echo.Context) error {
 		return ctx.JSON(http.StatusOK, e.Routes())
