@@ -2,7 +2,6 @@ package signer
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -38,19 +37,21 @@ func NewSignerClientWithTLSOpts(server string, config *tlsconfig.TLSCertConfig, 
 	return client, err
 }
 
-func NewTransactionClient(server string, skipTLSVerify bool, opts ...ClientOption) (*TransactionClient, error) {
+func NewTransactionClient(server string, config *tlsconfig.TLSCertConfig, opts ...ClientOption) (*TransactionClient, error) {
 	tc := new(TransactionClient)
 
 	logrus.Infof("New transaction client")
 
 	opts = append([]ClientOption{func(c *Client) error {
-		if skipTLSVerify && c.Client == nil {
-			tr := &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		if config != nil && c.Client == nil {
+			tlsconf, err := tlsconfig.GetTLSConfig(config)
+			if err != nil {
+				return err
 			}
-
+			tr := &http.Transport{
+				TLSClientConfig: tlsconf,
+			}
 			c.Client = &http.Client{Transport: tr}
-
 		}
 
 		return nil
