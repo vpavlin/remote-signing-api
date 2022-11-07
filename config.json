@@ -4,7 +4,8 @@
         "port": 4444,
         "logLevel": "debug",
         "certPath": "localhost.crt",
-        "keyPath": "localhost.key"
+        "keyPath": "localhost.key",
+        "caCertPath": "NFTEngage.crt"
     },
     "rpcUrls": [
         {

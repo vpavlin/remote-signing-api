@@ -6,11 +6,12 @@ import (
 )
 
 type Server struct {
-	Hostname string `json:"hostname"`
-	Port     int    `json:"port"`
-	LogLevel string `json:"logLevel"`
-	CertPath string `json:"certPath"`
-	KeyPath  string `json:"keyPath"`
+	Hostname   string `json:"hostname"`
+	Port       int    `json:"port"`
+	LogLevel   string `json:"logLevel"`
+	CertPath   string `json:"certPath"`
+	KeyPath    string `json:"keyPath"`
+	CACertPath string `json:"caCertPath"`
 }
 
 type Rpc struct {

@@ -10,21 +10,24 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/sirupsen/logrus"
+	tlsconfig "github.com/vpavlin/remote-signing-api/pkg/tlsConfig"
 )
 
 type TransactionClient struct {
 	client *ClientWithResponses
 }
 
-func NewSignerClientWithTLSOpts(server string, skipTLSVerify bool, opts ...ClientOption) (*ClientWithResponses, error) {
+func NewSignerClientWithTLSOpts(server string, config *tlsconfig.TLSCertConfig, opts ...ClientOption) (*ClientWithResponses, error) {
 	opts = append([]ClientOption{func(c *Client) error {
-		if skipTLSVerify && c.Client == nil {
-			tr := &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		if config != nil && c.Client == nil {
+			tlsconf, err := tlsconfig.GetTLSConfig(config)
+			if err != nil {
+				return err
 			}
-
+			tr := &http.Transport{
+				TLSClientConfig: tlsconf,
+			}
 			c.Client = &http.Client{Transport: tr}
-
 		}
 
 		return nil

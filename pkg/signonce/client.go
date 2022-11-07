@@ -2,9 +2,10 @@ package signonce
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"net/http"
+
+	tlsconfig "github.com/vpavlin/remote-signing-api/pkg/tlsConfig"
 )
 
 type NonceClient struct {
@@ -12,11 +13,15 @@ type NonceClient struct {
 	apiKey      string
 }
 
-func NewNonceClient(server string, insecureSkipVerify bool, apiKey string) (*NonceClient, error) {
-	skipVerify := func(c *Client) error {
-		if insecureSkipVerify && c.Client == nil {
+func NewNonceClient(server string, config *tlsconfig.TLSCertConfig, apiKey string) (*NonceClient, error) {
+	clientOpt := func(c *Client) error {
+		if config != nil && c.Client == nil {
+			tlsconf, err := tlsconfig.GetTLSConfig(config)
+			if err != nil {
+				return err
+			}
 			tr := &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				TLSClientConfig: tlsconf,
 			}
 			c.Client = &http.Client{Transport: tr}
 		}
@@ -24,7 +29,7 @@ func NewNonceClient(server string, insecureSkipVerify bool, apiKey string) (*Non
 		return nil
 	}
 
-	nonceClient, err := NewClientWithResponses(server, skipVerify)
+	nonceClient, err := NewClientWithResponses(server, clientOpt)
 	if err != nil {
 		return nil, err
 	}
