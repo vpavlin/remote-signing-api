@@ -5,6 +5,7 @@ import (
 
 	"github.com/jessevdk/go-flags"
 	"github.com/vpavlin/remote-signing-api/pkg/nonce"
+	tlsconfig "github.com/vpavlin/remote-signing-api/pkg/tlsConfig"
 )
 
 type NonceArgs struct {
@@ -14,6 +15,9 @@ type NonceArgs struct {
 	Action        string `long:"action" description:"Action to perform" required:"true"`
 	Server        string `long:"server" description:"Signer Server URL" default:"https://localhost:4444"`
 	SkipTlsVerify bool   `long:"skipVerify" description:"Skip TLS Verify"`
+	ClientCert    string `long:"clientcert" description:"Client Certificate"`
+	ClientKey     string `long:"clientkey" description:"Client Key"`
+	CACert        string `long:"cacert" description:"Certificate Authority"`
 }
 
 var opts NonceArgs
@@ -62,7 +66,14 @@ func getNonceWithSigner(chainId uint64, address string, apiKey string) error {
 }
 
 func getNonce(chainId uint64, address string, apiKey string) error {
-	client, err := nonce.NewNonceClient(opts.Server, opts.SkipTlsVerify, opts.Key)
+
+	c := &tlsconfig.TLSCertConfig{
+		ClientKeyFile:  opts.ClientKey,
+		ClientCertFile: opts.ClientCert,
+		CACertFile:     opts.CACert,
+	}
+
+	client, err := nonce.NewNonceClient(opts.Server, c, opts.Key)
 	if err != nil {
 		return err
 	}

@@ -1,7 +1,11 @@
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 
@@ -41,8 +45,39 @@ func main() {
 	})
 
 	if len(config.Server.CertPath) > 0 && len(config.Server.KeyPath) > 0 {
-		logrus.Fatal(e.StartTLS(fmt.Sprintf("%s:%d", config.Server.Hostname, config.Server.Port), config.Server.CertPath, config.Server.KeyPath))
+		logrus.Infof("Starting TLS server at %s", fmt.Sprintf("https://%s:%d", config.Server.Hostname, config.Server.Port))
+		s := http.Server{
+			Addr:      fmt.Sprintf("%s:%d", config.Server.Hostname, config.Server.Port),
+			Handler:   e,
+			TLSConfig: getTLSConfig(config.Server),
+		}
+		logrus.Fatal(s.ListenAndServeTLS(config.Server.CertPath, config.Server.KeyPath))
 	}
 
 	logrus.Fatal(e.Start(fmt.Sprintf("%s:%d", config.Server.Hostname, config.Server.Port)))
+}
+
+func getTLSConfig(config *config.Server) *tls.Config {
+	var caCert []byte
+	var err error
+	var caCertPool *x509.CertPool
+
+	caCert, err = ioutil.ReadFile(config.CACertPath)
+	if err != nil {
+		log.Fatal("Error opening cert file", config.CACertPath, ", error ", err)
+	}
+	caCertPool = x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+
+	return &tls.Config{
+		ServerName: fmt.Sprintf("%s:%d", config.Hostname, config.Port),
+		// ClientAuth: tls.NoClientCert,				// Client certificate will not be requested and it is not required
+		// ClientAuth: tls.RequestClientCert,			// Client certificate will be requested, but it is not required
+		// ClientAuth: tls.RequireAnyClientCert,		// Client certificate is required, but any client certificate is acceptable
+		// ClientAuth: tls.VerifyClientCertIfGiven,		// Client certificate will be requested and if present must be in the server's Certificate Pool
+		// ClientAuth: tls.RequireAndVerifyClientCert,	// Client certificate will be required and must be present in the server's Certificate Pool
+		ClientAuth: 4,
+		ClientCAs:  caCertPool,
+		MinVersion: tls.VersionTLS12, // TLS versions below 1.2 are considered insecure - see https://www.rfc-editor.org/rfc/rfc7525.txt for details
+	}
 }
