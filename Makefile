@@ -3,6 +3,7 @@ PUSH_TARGET=quay.io/rubixlife/remote-signing-api:$(VERSION)
 QUAY_USER=vpavlin0
 QUAY_PASSWORD=
 LABEL=
+CONFIG_FILE=config.json
 
 
 generate:
@@ -11,7 +12,7 @@ fmt:
 	go fmt ./...
 
 serve:
-	go run server/server.go config.json
+	go run server/server.go $(CONFIG_FILE)
 
 build: fmt
 	go build -o remote-signing-api server/server.go 

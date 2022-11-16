@@ -1,18 +1,21 @@
 package postgres
 
 import (
+	"database/sql"
 	"fmt"
+	"os"
 
 	"github.com/lib/pq"
+	"github.com/sirupsen/logrus"
 	"github.com/vpavlin/remote-signing-api/internal/types"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 type Nonce struct {
-	Address        string  `gorm:"primaryKey"`
-	Contract       *string `gorm:"primaryKey"`
-	ChainId        uint64  `gorm:"primaryKey"`
+	Address        string         `gorm:"primaryKey"`
+	Contract       sql.NullString `gorm:"primaryKey,default:NULL"`
+	ChainId        uint64         `gorm:"primaryKey"`
 	Nonce          uint64
 	ReturnedNonces pq.Int64Array `gorm:"type:integer[]"`
 	LastUsed       int64
@@ -45,9 +48,16 @@ func (r *PostgresRepository) Store(n *types.NonceSerializable) error {
 		return fmt.Errorf("Nonce object not initiliezed properly")
 	}
 
+	contract := sql.NullString{}
+
+	if n.Contract != nil {
+		contract.String = *n.Contract
+		contract.Valid = true
+	}
+
 	model := Nonce{
 		Address:        n.Address,
-		Contract:       n.Contract,
+		Contract:       contract,
 		ChainId:        n.ChainId,
 		Nonce:          n.Nonce,
 		ReturnedNonces: make(pq.Int64Array, len(n.ReturnedNonces)),
@@ -60,22 +70,43 @@ func (r *PostgresRepository) Store(n *types.NonceSerializable) error {
 
 	result := r.db.Save(&model)
 
+	logrus.Infof("Saved: %d", result.RowsAffected)
+
 	return result.Error
 }
 
 func (r *PostgresRepository) Load(chainId uint64, address string, contract *string) (*types.NonceSerializable, error) {
 	m := Nonce{}
-	result := r.db.Find(&m, "address = ? && contract = ? && chainId = ?", address, contract, chainId)
+
+	tx := r.db.Model(&m)
+
+	if contract == nil {
+		tx.Where("contract is NULL")
+	} else {
+		tx.Where("contract = ?", contract)
+	}
+
+	result := tx.Find(&m, "address = ? AND chain_id = ?", address, chainId)
 	if result.Error != nil {
+		logrus.Errorf("Error %s", result.Error)
 		return nil, result.Error
 	}
+
+	if result.RowsAffected == 0 {
+		return nil, os.ErrNotExist
+	}
+
+	logrus.Infof("Contract: %v", m.Contract)
 	ns := &types.NonceSerializable{
 		Address:        m.Address,
-		Contract:       m.Contract,
 		ChainId:        m.ChainId,
 		Nonce:          m.Nonce,
 		ReturnedNonces: make(types.SortedNonceArr, len(m.ReturnedNonces)),
 		LastUsed:       m.LastUsed,
+	}
+
+	if m.Contract.Valid {
+		ns.Contract = &m.Contract.String
 	}
 
 	for i, v := range m.ReturnedNonces {

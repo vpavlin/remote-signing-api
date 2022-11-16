@@ -32,7 +32,7 @@ func NewNonceManager(rpcUrls []config.Rpc, config *config.NonceManagerConfig) (*
 	nm.clients = make(map[ChainID]*ethclient.Client)
 	nm.initClients(rpcUrls)
 	nm.config = config
-	storage, err := storage.NewStorage("filestorage", nm.config.StorageConfig)
+	storage, err := storage.NewStorage(nm.config.StorageType, nm.config.StorageConfig)
 	if err != nil {
 		return nil, err
 	}
