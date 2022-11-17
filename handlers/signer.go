@@ -57,7 +57,7 @@ func SetupSigner(e *echo.Echo, config *config.Config) {
 }
 
 func (sh SignerHandlers) NewSigner(ctx echo.Context) error {
-	ns := new(signer.SignerKey)
+	ns := &signer.SignerKey{}
 	err := ctx.Bind(ns)
 	if err != nil {
 		return err
@@ -86,7 +86,7 @@ func (sn SignerHandlers) SignBytes(ctx echo.Context, address signer.Address, par
 	bearer := params.Authorization
 	apiKey := bearer[7:]
 
-	data := new(signer.SignBytesJSONRequestBody)
+	data := &signer.SignBytesJSONRequestBody{}
 
 	err := ctx.Bind(data)
 	if err != nil {
@@ -118,7 +118,7 @@ func (sn SignerHandlers) ReplaceKey(ctx echo.Context, address signer.Address, pa
 	bearer := params.Authorization
 	apiKey := bearer[7:]
 
-	data := new(signer.ReplaceKeyJSONRequestBody)
+	data := &signer.ReplaceKeyJSONRequestBody{}
 
 	err := ctx.Bind(data)
 	if err != nil {
@@ -151,42 +151,3 @@ func (sn SignerHandlers) Health(ctx echo.Context) error {
 	}
 	return ctx.NoContent(http.StatusOK)
 }
-
-/*func HandleTxSign(ctx echo.Context) error {
-	bearer := ctx.Request().Header.Get("Authorization")
-	key := bearer[7:]
-
-	log.Println("meh")
-	address := ctx.Param("address")
-	chainIdS := ctx.Param("chainId")
-	tx := new(auth.RestTransaction)
-	err := json.NewDecoder(ctx.Request().Body).Decode(tx)
-	if err != nil {
-		return fmt.Errorf("Could not unmarshal the request body: %s", err)
-	}
-	tx.Address = common.HexToAddress(address)
-
-	wallet, err := wallet.NewWalletFromStorage(key, tx.Address)
-	if err != nil {
-		return err
-	}
-
-	err = tx.Unmarshal()
-	if err != nil {
-		return err
-	}
-
-	chainId, err := strconv.Atoi(chainIdS)
-	if err != nil {
-		return err
-	}
-
-	signedTx, err := wallet.SignTX(tx.Transaction, big.NewInt(int64(chainId)))
-	if err != nil {
-		return err
-	}
-
-	tx.Transaction = signedTx
-
-	return ctx.JSON(http.StatusOK, signedTx)
-}*/
