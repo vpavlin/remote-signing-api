@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"crypto/sha256"
 	"database/sql"
 	"fmt"
 	"os"
@@ -13,12 +14,14 @@ import (
 )
 
 type Nonce struct {
-	Address        string         `gorm:"primaryKey"`
-	Contract       sql.NullString `gorm:"primaryKey,default:NULL"`
-	ChainId        uint64         `gorm:"primaryKey"`
+	ID             string `gorm:"primaryKey"`
+	Address        string
+	Contract       sql.NullString `gorm:"default:NULL"`
+	ChainId        uint64
 	Nonce          uint64
 	ReturnedNonces pq.Int64Array `gorm:"type:integer[]"`
 	LastUsed       int64
+	SigNonce       bool
 }
 
 type PostgresRepository struct {
@@ -35,6 +38,7 @@ func NewPostgresRepository(c interface{}) (types.INonceStorage, error) {
 		return nil, err
 	}
 
+	logrus.Infof("Migrating...")
 	err = db.AutoMigrate(&Nonce{})
 	if err != nil {
 		return nil, err
@@ -56,12 +60,14 @@ func (r *PostgresRepository) Store(n *types.NonceSerializable) error {
 	}
 
 	model := Nonce{
+		ID:             getId(n.Address, n.Contract, n.ChainId),
 		Address:        n.Address,
 		Contract:       contract,
 		ChainId:        n.ChainId,
 		Nonce:          n.Nonce,
 		ReturnedNonces: make(pq.Int64Array, len(n.ReturnedNonces)),
 		LastUsed:       n.LastUsed,
+		SigNonce:       n.Contract != nil,
 	}
 
 	for i, v := range n.ReturnedNonces {
@@ -78,15 +84,7 @@ func (r *PostgresRepository) Store(n *types.NonceSerializable) error {
 func (r *PostgresRepository) Load(chainId uint64, address string, contract *string) (*types.NonceSerializable, error) {
 	m := Nonce{}
 
-	tx := r.db.Model(&m)
-
-	if contract == nil {
-		tx.Where("contract is NULL")
-	} else {
-		tx.Where("contract = ?", contract)
-	}
-
-	result := tx.Find(&m, "address = ? AND chain_id = ?", address, chainId)
+	result := r.db.Find(&m, "id = ?", getId(address, contract, chainId))
 	if result.Error != nil {
 		logrus.Errorf("Error %s", result.Error)
 		return nil, result.Error
@@ -114,4 +112,13 @@ func (r *PostgresRepository) Load(chainId uint64, address string, contract *stri
 	}
 
 	return ns, nil
+}
+
+func getId(address string, contract *string, chainId uint64) string {
+	contractVal := ""
+	if contract != nil {
+		contractVal = *contract
+	}
+	hash := sha256.Sum256([]byte(fmt.Sprintf("%s-%s-%d", address, contractVal, chainId)))
+	return fmt.Sprintf("%x", hash)
 }

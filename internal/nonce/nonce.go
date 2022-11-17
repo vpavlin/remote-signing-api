@@ -18,9 +18,10 @@ import (
 )
 
 const (
-	auto_sync_interval = 10 * time.Minute
-	auto_sync_after    = 1 * time.Hour
-	auto_sync_max_err  = 10
+	auto_sync_max_interval = 24 * time.Hour
+	auto_sync_interval     = 10 * time.Minute
+	auto_sync_after        = 1 * time.Hour
+	auto_sync_max_err      = 10
 )
 
 type INonce interface {
@@ -76,7 +77,7 @@ func NewNonceWithConfig(client *ethclient.Client, storage *types.INonceStorage, 
 		return nonce, nil
 	}
 
-	err = nonce.Sync(client)
+	_, err = nonce.Sync(client)
 	if err != nil {
 		return nil, err
 	}
@@ -90,15 +91,17 @@ func NewNonceWithConfig(client *ethclient.Client, storage *types.INonceStorage, 
 	return nonce, nil
 }
 
-func (n *Nonce) Sync(client *ethclient.Client) (err error) {
+func (n *Nonce) Sync(client *ethclient.Client) (updated bool, err error) {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
 	defer func() {
-		deferErr := n.storage.Store(n.serialize())
-		if deferErr != nil {
-			logrus.Error(deferErr)
-			err = deferErr
+		if updated {
+			deferErr := n.storage.Store(n.serialize())
+			if deferErr != nil {
+				logrus.Error(deferErr)
+				err = deferErr
+			}
 		}
 	}()
 
@@ -108,26 +111,30 @@ func (n *Nonce) Sync(client *ethclient.Client) (err error) {
 	if n.Contract != nil {
 		c, err := bindings.NewSigNonce(common.HexToAddress(*n.Contract), client)
 		if err != nil {
-			return fmt.Errorf("Failed to bound the contract %s: %s", *n.Contract, err)
+			return false, fmt.Errorf("Failed to bound the contract %s: %s", *n.Contract, err)
 		}
 		bigNonce, err := c.SigNonce(&bind.CallOpts{}, common.HexToAddress(n.Address))
 		if err != nil {
-			return fmt.Errorf("Failed to get nonce from %s: %s", *n.Contract, err)
+			return false, fmt.Errorf("Failed to get nonce from %s: %s", *n.Contract, err)
 		}
 
 		nonce = bigNonce.Uint64()
 	} else {
 		nonce, err = client.PendingNonceAt(context.Background(), common.HexToAddress(n.Address))
 		if err != nil {
-			return fmt.Errorf("GetNonce: cannot get account %s nonce, err: %s, set it to nil!",
+			return false, fmt.Errorf("GetNonce: cannot get account %s nonce, err: %s, set it to nil!",
 				n.Address, err)
 		}
 	}
 
+	if nonce == n.nonce {
+		return false, nil
+	}
+	updated = true
 	n.nonce = nonce
 	n.returnedNonces = make(types.SortedNonceArr, 0)
 
-	return err
+	return true, err
 }
 
 func (n *Nonce) GetNonce() (nonce uint64, err error) {
@@ -218,22 +225,30 @@ func (n *Nonce) autoSync(client *ethclient.Client, syncInterval time.Duration, s
 	if n.Contract != nil {
 		logger = logger.WithField("contract", *n.Contract)
 	}
+
+	interval := syncInterval
 	logger.Info("Starting AutoSync")
 	for {
 		select {
-		case <-time.After(syncInterval):
+		case <-time.After(interval):
 			//logrus.Debug(n.lastUsed, " + ", int64(syncAfter.Seconds()), " = ", n.lastUsed+int64(syncAfter.Seconds()), " < ", time.Now().Unix())
 			if n.lastUsed+int64(syncAfter.Seconds()) < time.Now().Unix() {
-				logger.Info("Executing auto-sync")
-				err := n.Sync(client)
+				logger.Infof("Executing auto-sync (interval: %d)", interval)
+				updated, err := n.Sync(client)
 				if err != nil {
-					syncInterval *= 2
+					interval *= 2
 					logger.Errorf("AutoSync: %s\n", err)
 					n.ErrCount++
 					if n.ErrCount > auto_sync_max_err {
 						return fmt.Errorf("Stopping the auto sync: %s", err)
 					}
 					//return err //TODO: should not return
+				}
+
+				if updated {
+					interval = syncInterval
+				} else if interval < auto_sync_max_interval {
+					interval *= 2
 				}
 			}
 		}

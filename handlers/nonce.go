@@ -143,7 +143,7 @@ func (nh NonceHandler) ReturnNonce(ctx echo.Context, chainId uint64, address str
 func (nh NonceHandler) SyncNonce(ctx echo.Context, chainId uint64, address string) error {
 	nm := ctx.Get("NonceManager").(*nonce.NonceManager)
 
-	err := nm.Sync(nonce.ChainID(chainId), address, nil)
+	_, err := nm.Sync(nonce.ChainID(chainId), address, nil)
 	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, &ErrorResponse{Error: err.Error()})
 	}

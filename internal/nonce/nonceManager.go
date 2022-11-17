@@ -79,15 +79,15 @@ func (nm *NonceManager) DecreaseNonce(chainId ChainID, address string, contract 
 	return nonce.DecreaseNonce()
 }
 
-func (nm *NonceManager) Sync(chainId ChainID, address string, contract *string) error {
+func (nm *NonceManager) Sync(chainId ChainID, address string, contract *string) (bool, error) {
 	nonce, err := nm.getNonceObject(chainId, address, contract)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	client, ok := nm.clients[chainId]
 	if !ok {
-		return fmt.Errorf("Unknown client for chainId %d", chainId)
+		return false, fmt.Errorf("Unknown client for chainId %d", chainId)
 	}
 
 	return nonce.Sync(client)
