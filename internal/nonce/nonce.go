@@ -67,13 +67,12 @@ func NewNonceWithConfig(client *ethclient.Client, storage *types.INonceStorage, 
 		}
 	}()
 
-	ns, err := nonce.storage.Load(chainId, address, contract)
+	err = nonce.Load()
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
 			return nil, err
 		}
 	} else {
-		nonce.deserialize(ns)
 		return nonce, nil
 	}
 
@@ -215,6 +214,16 @@ func (n *Nonce) DecreaseNonce() error {
 
 	return err
 
+}
+
+func (n *Nonce) Load() error {
+	ns, err := n.storage.Load(n.ChainId, n.Address, n.Contract)
+	if err != nil {
+		return err
+	}
+
+	n.deserialize(ns)
+	return nil
 }
 
 func (n *Nonce) autoSync(client *ethclient.Client, syncInterval time.Duration, syncAfter time.Duration) error {

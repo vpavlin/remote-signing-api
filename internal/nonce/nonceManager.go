@@ -134,8 +134,14 @@ func (nm *NonceManager) getNonceObject(chainId ChainID, address string, contract
 		if err != nil {
 			return nil, err
 		}
-		an.Nonces[nonceId] = nonce
+	} else {
+		err := nonce.Load()
+		if err != nil {
+			return nil, err
+		}
 	}
+
+	an.Nonces[nonceId] = nonce
 
 	return nonce, nil
 }
