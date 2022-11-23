@@ -36,3 +36,17 @@ run-container:
 			 -v $PWD/localhost.crt:/opt/remote-signing-api/localhost.crt:z \
 			 -v $PWD/localhost.key:/opt/remote-signing-api/localhost.key:z \
 			 rubixlife/remote-signing-api:v0.1
+
+release-tag:
+ifeq ($(shell git branch --show-current | grep -e main -e master),)
+	@echo "Not on main/master branch!"
+	@exit 1
+else
+	@git pull
+	@git log HEAD^..HEAD
+	@printf -- '=%.0s' {1..100}
+	$(eval new_tag=$(shell git tag -l --sort=-v:refname | head -1 | awk -F. '{$$NF = $$NF + 1;} 1' | sed 's/ /./g'))
+	@echo -ne "\n\n===> Is this the commit you'd like to release as $(new_tag)? [y/N] " && read ans && [ $${ans:-N} = y ]
+	@git tag $(new_tag)
+	@git push --tags
+endif
