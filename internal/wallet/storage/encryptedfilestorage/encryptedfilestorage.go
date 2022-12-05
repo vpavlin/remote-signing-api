@@ -95,7 +95,7 @@ func (fs *FileStorage) Load(address string, apiKeyHashed string) (*types.WalletS
 }
 
 func (fs *FileStorage) getFilename(address string) string {
-	return path.Join(fs.config.Path, fmt.Sprintf(".%s.wallet.dat", address))
+	return path.Join(fs.config.Path, fmt.Sprintf("%s.wallet.dat", address))
 }
 
 func (fs *FileStorage) getFilePassword(key string) []byte {
